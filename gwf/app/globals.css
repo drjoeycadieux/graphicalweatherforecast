@@ -1,0 +1,310 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+:root {
+  --background: #edf2f7;
+  --background-deep: #dfe7f1;
+  --panel: rgba(255, 255, 255, 0.8);
+  --panel-border: rgba(148, 163, 184, 0.32);
+  --foreground: #15202b;
+  --muted: #475569;
+  --shadow: rgba(15, 23, 42, 0.12);
+  --accent: #2c6ea6;
+  --accent-soft: rgba(44, 110, 166, 0.1);
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background:
+    linear-gradient(180deg, var(--background-deep) 0%, #f8fafc 20%, #eef3f8 100%);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+body {
+  min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.page-shell {
+  width: 100%;
+  min-height: 100vh;
+  padding: 18px 18px 28px;
+}
+
+.forecast-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 6px 18px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: #475569;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(1.7rem, 3vw, 2.8rem);
+  color: #0f172a;
+}
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+}
+
+.pill {
+  display: none;
+}
+
+.hero-panel {
+  display: none;
+}
+
+.forecast-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  padding: 9px 14px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.toolbar,
+.action-bar {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 600;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: min(70vw, 760px);
+}
+
+.tool-button {
+  appearance: none;
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--foreground);
+  border: 1px solid rgba(100, 116, 139, 0.28);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.tool-button:hover,
+.tool-button.active {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.12);
+  background: rgba(226, 232, 240, 0.9);
+  border-color: rgba(44, 110, 166, 0.38);
+}
+
+.user-panel {
+  display: none;
+}
+
+.map-user-badge {
+  position: absolute;
+  right: 20px;
+  top: 18px;
+  z-index: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.08);
+  color: var(--foreground);
+  font-size: 0.8rem;
+}
+
+.auth-card {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 800;
+  display: grid;
+  gap: 12px;
+  width: min(420px, calc(100vw - 32px));
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--panel-border);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 24px 50px rgba(15, 23, 42, 0.12);
+}
+
+.auth-card input {
+  border: 1px solid rgba(148, 163, 184, 0.38);
+  border-radius: 10px;
+  background: rgba(248, 250, 252, 0.8);
+  color: var(--foreground);
+  padding: 12px 14px;
+  font-size: 0.95rem;
+}
+
+.auth-error {
+  color: #fca5a5;
+  font-size: 0.8rem;
+}
+
+.panel-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.98rem;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.chip-row span {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 7px 12px;
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.map-shell {
+  position: relative;
+  width: 100%;
+  height: calc(100vh - 110px);
+  min-height: 620px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 22px 40px rgba(15, 23, 42, 0.08);
+}
+
+.map-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100vh;
+  background: rgba(255, 255, 255, 0.74);
+  color: var(--foreground);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.leaflet-map {
+  width: 100%;
+  height: 100%;
+  background: #e5e7eb;
+}
+
+.floating-save {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 500;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #0ea5e9, #2563eb);
+  color: white;
+  font-weight: 800;
+  padding: 10px 16px;
+  cursor: pointer;
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.35);
+}
+
+.risk-legend {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 500;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 8px 12px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  backdrop-filter: blur(10px);
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
+}
+
+.risk-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.25);
+}
+
+.weather-pin-wrapper {
+  background: transparent;
+  border: none;
+}
+
+.leaflet-container {
+  font: inherit;
+}
+
+.leaflet-control-zoom {
+  border: none !important;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.14) !important;
+}
+
+.leaflet-control-zoom a {
+  background: rgba(255, 255, 255, 0.9) !important;
+  color: var(--foreground) !important;
+  border-bottom-color: rgba(148, 163, 184, 0.3) !important;
+}
+
+@media (max-width: 768px) {
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .leaflet-map {
+    height: 620px;
+  }
+
+  .risk-legend {
+    position: static;
+    margin: 10px;
+    grid-template-columns: repeat(2, minmax(110px, 1fr));
+  }
+}
