@@ -29,7 +29,12 @@ const hazards: { value: Hazard; short: string }[] = [
   { value: "Hail", short: "HAIL" },
 ];
 
-const OPENFREEMAP_STYLE = "https://tiles.openfreemap.org/styles/bright";
+const POLITICAL_MAP_STYLE = {
+  version: 8 as const,
+  sources: {},
+  layers: [{ id: "political-background", type: "background" as const, paint: { "background-color": "#7fa3c8" } }],
+};
+const US_COUNTRIES_GEOJSON = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson";
 const US_STATES_GEOJSON = "https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json";
 
 type PolygonFeature = {
@@ -64,6 +69,18 @@ const stateBoundaryLayer = {
   id: "us-state-boundaries",
   type: "line" as const,
   paint: { "line-color": "#313131", "line-width": 1.1 },
+};
+
+const stateFillLayer = {
+  id: "us-state-fills",
+  type: "fill" as const,
+  paint: { "fill-color": "#f2ede2", "fill-opacity": 1 },
+};
+
+const countryFillLayer = {
+  id: "country-fills",
+  type: "fill" as const,
+  paint: { "fill-color": "#858585", "fill-opacity": 1 },
 };
 
 function DraftPolygon({ draft, category }: { draft: [number, number][]; category: RiskCategory }) {
@@ -169,13 +186,17 @@ export default function WeatherEditor() {
           initialViewState={{ longitude: -96, latitude: 38.5, zoom: 4 }}
           minZoom={3}
           maxZoom={8}
-          mapStyle={OPENFREEMAP_STYLE}
+          mapStyle={POLITICAL_MAP_STYLE}
           onClick={(event: MapLayerMouseEvent) => {
             if (canEdit && drawing) setDraft([...draft, [event.lngLat.lat, event.lngLat.lng]]);
           }}
         >
           <NavigationControl position="top-right" />
+          <Source id="countries" type="geojson" data={US_COUNTRIES_GEOJSON}>
+            <Layer {...countryFillLayer} />
+          </Source>
           <Source id="us-states" type="geojson" data={US_STATES_GEOJSON}>
+            <Layer {...stateFillLayer} />
             <Layer {...stateBoundaryLayer} />
           </Source>
           <Source id="saved-outlooks" type="geojson" data={savedPolygonData}>
