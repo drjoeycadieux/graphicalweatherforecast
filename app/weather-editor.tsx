@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import Map, { Layer, NavigationControl, Source, type MapLayerMouseEvent } from "react-map-gl/maplibre";
+import type { FeatureCollection, Geometry, GeoJsonProperties } from "geojson";
+import { Map as MapLibreMap, NavigationControl } from "maplibre-gl";
 import { type User, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { addDoc, collection, getDocs, orderBy, query, serverTimestamp } from "firebase/firestore";
 
@@ -13,6 +14,7 @@ type MapRegion = "USA" | "Quebec";
 type Hazard = "Severe Thunderstorms" | "Tornado" | "Wind" | "Hail";
 type RiskCategory = "General Thunder" | "Marginal" | "Slight" | "Enhanced" | "Moderate" | "High";
 type OutlookShape = { id?: string; day: OutlookDay; hazard: Hazard; category: RiskCategory; points: [number, number][]; createdAt?: unknown; updatedAt?: unknown };
+type GeoJsonCollection = FeatureCollection<Geometry, GeoJsonProperties>;
 
 const riskMeta: Record<RiskCategory, { color: string; ink: string; short: string }> = {
   "General Thunder": { color: "#c9c9c9", ink: "#5d636b", short: "T" },
@@ -40,8 +42,8 @@ const POLITICAL_MAP_STYLE = {
   sources: {},
   layers: [{ id: "political-background", type: "background" as const, paint: { "background-color": "#7fa3c8" } }],
 };
-const US_COUNTRIES_GEOJSON = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson";
-const US_STATES_GEOJSON = "https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json";
+const US_COUNTRIES_GEOJSON = "/api/map-data/countries";
+const US_STATES_GEOJSON = "/api/map-data/states";
 
 type PolygonFeature = {
   type: "Feature";
@@ -89,13 +91,46 @@ const countryFillLayer = {
   paint: { "fill-color": "#858585", "fill-opacity": 1 },
 };
 
-function DraftPolygon({ draft, category }: { draft: [number, number][]; category: RiskCategory }) {
-  if (draft.length < 2) return null;
-  const data = polygonCollection([polygonFeature(draft, riskMeta[category].color, riskMeta[category].ink, 0.52)]);
-  return <Source id="draft-outlook" type="geojson" data={data}>
-    <Layer {...polygonFillLayer} id="draft-fill" />
-    <Layer {...polygonOutlineLayer} id="draft-outline" paint={{ "line-color": riskMeta[category].ink, "line-width": 2, "line-dasharray": [3, 3] }} />
-  </Source>;
+function PoliticalMap({ region, countryData, stateData, savedPolygonData, draft, category, onMapClick }: {
+  region: MapRegion; countryData: GeoJsonCollection | null; stateData: GeoJsonCollection | null;
+  savedPolygonData: ReturnType<typeof polygonCollection>; draft: [number, number][];
+  category: RiskCategory; onMapClick: (point: [number, number]) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const view = regionViews[region];
+    const map = new MapLibreMap({ container, style: POLITICAL_MAP_STYLE, center: [view.longitude, view.latitude], zoom: view.zoom, minZoom: 3, maxZoom: 8 });
+    map.addControl(new NavigationControl(), "top-right");
+    map.on("click", (event) => onMapClick([event.lngLat.lat, event.lngLat.lng]));
+    map.on("load", () => {
+      if (countryData) {
+        map.addSource("countries", { type: "geojson", data: countryData });
+        map.addLayer({ ...countryFillLayer, source: "countries" });
+      }
+      if (stateData) {
+        map.addSource("states", { type: "geojson", data: stateData });
+        map.addLayer({ ...stateFillLayer, source: "states" });
+        map.addLayer({ ...stateBoundaryLayer, source: "states" });
+      }
+      map.addSource("saved-outlooks", { type: "geojson", data: savedPolygonData });
+      map.addLayer({ ...polygonFillLayer, source: "saved-outlooks" });
+      map.addLayer({ ...polygonOutlineLayer, source: "saved-outlooks" });
+      if (draft.length > 1) {
+        const draftData = draft.length > 2 ? polygonCollection([polygonFeature(draft, riskMeta[category].color, riskMeta[category].ink, 0.52)]) : { type: "FeatureCollection" as const, features: [{ type: "Feature" as const, geometry: { type: "LineString" as const, coordinates: draft.map(([lat, lng]) => [lng, lat]) }, properties: {} }] };
+        map.addSource("draft-outlook", { type: "geojson", data: draftData });
+        if (draft.length > 2) map.addLayer({ ...polygonFillLayer, id: "draft-fill", source: "draft-outlook" });
+        map.addLayer({ ...polygonOutlineLayer, id: "draft-outline", source: "draft-outlook", paint: { "line-color": riskMeta[category].ink, "line-width": 2, "line-dasharray": [3, 3] } });
+      }
+    });
+    return () => map.remove();
+    // The keyed component remounts when map inputs change; recreate the map once per mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return <div ref={containerRef} className="maplibre-canvas" />;
 }
 
 export default function WeatherEditor() {
@@ -113,6 +148,8 @@ export default function WeatherEditor() {
   const [authError, setAuthError] = useState("");
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(!auth);
+  const [countryData, setCountryData] = useState<GeoJsonCollection | null>(null);
+  const [stateData, setStateData] = useState<GeoJsonCollection | null>(null);
 
   useEffect(() => {
     if (!auth) return;
@@ -122,8 +159,11 @@ export default function WeatherEditor() {
   useEffect(() => {
     const load = async () => {
       if (!db) { setDataError("Connect Firebase to load and publish outlooks."); setLoading(false); return; }
+      const timeout = new Promise<never>((_, reject) => {
+        window.setTimeout(() => reject(new Error("Firestore request timed out.")), 8000);
+      });
       try {
-        const snapshot = await getDocs(query(collection(db, "spc-outlooks"), orderBy("createdAt", "asc")));
+        const snapshot = await Promise.race([getDocs(query(collection(db, "spc-outlooks"), orderBy("createdAt", "asc"))), timeout]);
         const results = snapshot.docs.map((doc) => {
           const data = doc.data() as Partial<OutlookShape>;
           return {
@@ -141,6 +181,21 @@ export default function WeatherEditor() {
       finally { setLoading(false); }
     };
     void load();
+  }, []);
+
+  useEffect(() => {
+    const loadMapData = async () => {
+      try {
+        const [countriesResponse, statesResponse] = await Promise.all([fetch(US_COUNTRIES_GEOJSON), fetch(US_STATES_GEOJSON)]);
+        if (!countriesResponse.ok || !statesResponse.ok) throw new Error("Map boundary data could not be loaded.");
+        const [countries, states] = await Promise.all([countriesResponse.json(), statesResponse.json()]) as [GeoJsonCollection, GeoJsonCollection];
+        setCountryData(countries);
+        setStateData(states);
+      } catch (error) {
+        console.error("Could not load map boundaries:", error);
+      }
+    };
+    void loadMapData();
   }, []);
 
   const canEdit = Boolean(db) && (!auth || Boolean(user));
@@ -191,30 +246,16 @@ export default function WeatherEditor() {
         <div className="rail-status"><span className="status-mark" />{dataError || (drawing ? "Click map to add vertices" : "Ready for edits")}<strong>{summary} · {hazard}</strong></div>
       </aside>
       <div className="maplibre-map">
-        <Map
-          key={region}
-          initialViewState={regionViews[region]}
-          minZoom={3}
-          maxZoom={8}
-          mapStyle={POLITICAL_MAP_STYLE}
-          onClick={(event: MapLayerMouseEvent) => {
-            if (canEdit && drawing) setDraft([...draft, [event.lngLat.lat, event.lngLat.lng]]);
-          }}
-        >
-          <NavigationControl position="top-right" />
-          <Source id="countries" type="geojson" data={US_COUNTRIES_GEOJSON}>
-            <Layer {...countryFillLayer} />
-          </Source>
-          <Source id="us-states" type="geojson" data={US_STATES_GEOJSON}>
-            <Layer {...stateFillLayer} />
-            <Layer {...stateBoundaryLayer} />
-          </Source>
-          <Source id="saved-outlooks" type="geojson" data={savedPolygonData}>
-            <Layer {...polygonFillLayer} />
-            <Layer {...polygonOutlineLayer} />
-          </Source>
-          <DraftPolygon draft={draft} category={category} />
-        </Map>
+        <PoliticalMap
+          key={`${region}-${countryData ? "ready" : "loading"}-${stateData ? "ready" : "loading"}`}
+          region={region}
+          countryData={countryData}
+          stateData={stateData}
+          savedPolygonData={savedPolygonData}
+          draft={draft}
+          category={category}
+          onMapClick={(point) => { if (canEdit && drawing) setDraft([...draft, point]); }}
+        />
       </div>
       {draft.length > 2 && <button className="floating-save" type="button" onClick={() => void saveShape({ day: selectedDay, hazard, category, points: draft })}>Save Polygon</button>}
       {loading ? <div className="map-data-status">Loading saved outlooks...</div> : null}
