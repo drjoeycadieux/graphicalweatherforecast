@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@turf/turf": "^7.4.0",
+    "fflate": "^0.8.3",
+    "shpjs": "^6.2.0"
+  }
+}
