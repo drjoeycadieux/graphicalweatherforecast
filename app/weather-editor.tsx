@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import type { LatLngExpression } from "leaflet";
-import { MapContainer, Polygon, TileLayer, useMapEvents } from "react-leaflet";
+import Map, { Layer, NavigationControl, Source, type MapLayerMouseEvent } from "react-map-gl/maplibre";
 import { type User, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { addDoc, collection, getDocs, orderBy, query, serverTimestamp } from "firebase/firestore";
 
@@ -30,18 +29,43 @@ const hazards: { value: Hazard; short: string }[] = [
   { value: "Hail", short: "HAIL" },
 ];
 
-function DrawLayer({ hazard, category, drawing, draft, setDraft, onSave, canEdit, day }: {
-  hazard: Hazard; category: RiskCategory; drawing: boolean; draft: [number, number][]; setDraft: (points: [number, number][]) => void;
-  onSave: (shape: OutlookShape) => Promise<void>; canEdit: boolean; day: OutlookDay;
-}) {
-  useMapEvents({ click(event) {
-    if (canEdit && drawing) setDraft([...draft, [event.latlng.lat, event.latlng.lng]]);
-  } });
+const OPENFREEMAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
-  return <>
-    {draft.length > 1 && <Polygon positions={draft as LatLngExpression[]} pathOptions={{ color: riskMeta[category].ink, fillColor: riskMeta[category].color, fillOpacity: 0.52, weight: 2, dashArray: "6 5" }} />}
-    {draft.length > 2 && <button className="floating-save" type="button" onClick={() => void onSave({ day, hazard, category, points: draft })}>Save Polygon</button>}
-  </>;
+type PolygonFeature = {
+  type: "Feature";
+  geometry: { type: "Polygon"; coordinates: number[][][] };
+  properties: { fill: string; outline: string; opacity: number };
+};
+
+function polygonFeature(points: [number, number][], fill: string, outline: string, opacity: number): PolygonFeature {
+  const coordinates = points.map(([lat, lng]) => [lng, lat]);
+  if (coordinates.length > 2) coordinates.push(coordinates[0]);
+  return { type: "Feature", geometry: { type: "Polygon", coordinates: [coordinates] }, properties: { fill, outline, opacity } };
+}
+
+function polygonCollection(features: PolygonFeature[]) {
+  return { type: "FeatureCollection" as const, features };
+}
+
+const polygonFillLayer = {
+  id: "outlook-fill",
+  type: "fill" as const,
+  paint: { "fill-color": ["get", "fill"] as unknown as string, "fill-opacity": ["get", "opacity"] as unknown as number },
+};
+
+const polygonOutlineLayer = {
+  id: "outlook-outline",
+  type: "line" as const,
+  paint: { "line-color": ["get", "outline"] as unknown as string, "line-width": 2 },
+};
+
+function DraftPolygon({ draft, category }: { draft: [number, number][]; category: RiskCategory }) {
+  if (draft.length < 2) return null;
+  const data = polygonCollection([polygonFeature(draft, riskMeta[category].color, riskMeta[category].ink, 0.52)]);
+  return <Source id="draft-outlook" type="geojson" data={data}>
+    <Layer {...polygonFillLayer} id="draft-fill" />
+    <Layer {...polygonOutlineLayer} id="draft-outline" paint={{ "line-color": riskMeta[category].ink, "line-width": 2, "line-dasharray": [3, 3] }} />
+  </Source>;
 }
 
 export default function WeatherEditor() {
@@ -90,6 +114,9 @@ export default function WeatherEditor() {
 
   const canEdit = Boolean(db) && (!auth || Boolean(user));
   const summary = useMemo(() => `${shapes.filter((shape) => shape.day === selectedDay && shape.hazard === hazard).length} areas plotted`, [hazard, selectedDay, shapes]);
+  const savedPolygonData = useMemo(() => polygonCollection(shapes
+    .filter((shape) => shape.day === selectedDay && shape.hazard === hazard && shape.points.length > 2)
+    .map((shape) => polygonFeature(shape.points, riskMeta[shape.category].color, riskMeta[shape.category].ink, 0.5))), [hazard, selectedDay, shapes]);
 
   const saveShape = async (shape: OutlookShape) => {
     if (!canEdit || !db) return;
@@ -130,14 +157,25 @@ export default function WeatherEditor() {
         <div className="rail-actions"><button type="button" className={drawing ? "tool-button active" : "tool-button"} onClick={() => { setDrawing(!drawing); setDraft([]); }}>{drawing ? "Stop drawing" : "Draw polygon"}</button><button type="button" className="tool-button quiet" onClick={() => setDraft([])}>Clear draft</button></div>
         <div className="rail-status"><span className="status-mark" />{dataError || (drawing ? "Click map to add vertices" : "Ready for edits")}<strong>{summary} · {hazard}</strong></div>
       </aside>
-      <MapContainer center={[38.5, -96]} zoom={4} minZoom={3} maxZoom={8} scrollWheelZoom className="leaflet-map" attributionControl={false}>
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        />
-        {shapes.filter((shape) => shape.day === selectedDay && shape.hazard === hazard && shape.points.length > 2).map((shape) => <Polygon key={shape.id ?? shape.points.length} positions={shape.points as LatLngExpression[]} pathOptions={{ color: riskMeta[shape.category].ink, fillColor: riskMeta[shape.category].color, fillOpacity: 0.5, weight: 2 }} />)}
-        <DrawLayer hazard={hazard} category={category} drawing={drawing} draft={draft} setDraft={setDraft} onSave={saveShape} canEdit={canEdit} day={selectedDay} />
-      </MapContainer>
+      <div className="maplibre-map">
+        <Map
+          initialViewState={{ longitude: -96, latitude: 38.5, zoom: 4 }}
+          minZoom={3}
+          maxZoom={8}
+          mapStyle={OPENFREEMAP_STYLE}
+          onClick={(event: MapLayerMouseEvent) => {
+            if (canEdit && drawing) setDraft([...draft, [event.lngLat.lat, event.lngLat.lng]]);
+          }}
+        >
+          <NavigationControl position="top-right" />
+          <Source id="saved-outlooks" type="geojson" data={savedPolygonData}>
+            <Layer {...polygonFillLayer} />
+            <Layer {...polygonOutlineLayer} />
+          </Source>
+          <DraftPolygon draft={draft} category={category} />
+        </Map>
+      </div>
+      {draft.length > 2 && <button className="floating-save" type="button" onClick={() => void saveShape({ day: selectedDay, hazard, category, points: draft })}>Save Polygon</button>}
       {loading ? <div className="map-data-status">Loading saved outlooks...</div> : null}
       <div className="map-stamp"><span>SPC DRAWING DESK</span><strong>DAY {selectedDay} / {hazard.toUpperCase()}</strong></div>
     </div>}

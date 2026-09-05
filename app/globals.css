@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
+@import "maplibre-gl/dist/maplibre-gl.css";
 
 :root {
   --background: #edf2f7;
@@ -301,6 +302,17 @@ h2 {
   width: 100%;
   height: 100%;
   background: #e5e7eb;
+}
+
+.maplibre-map {
+  width: 100%;
+  height: 100%;
+  background: #e5e7eb;
+}
+
+.maplibre-map .maplibregl-map {
+  width: 100%;
+  height: 100%;
 }
 
 .floating-save {

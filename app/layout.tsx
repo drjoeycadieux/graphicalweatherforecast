@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Severe Weather Drawing Desk",
-  description: "A Leaflet workspace for drawing SPC Day 1, Day 2, and Day 3 outlook areas.",
+  description: "A MapLibre workspace for drawing SPC Day 1, Day 2, and Day 3 outlook areas.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
