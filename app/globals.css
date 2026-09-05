@@ -784,7 +784,8 @@ h2 {
 
 .rail-signout:hover { color: #f2c18b; text-decoration: underline; }
 
-.leaflet-map {
+.leaflet-map,
+.maplibre-map {
   margin-left: 270px;
   width: calc(100% - 270px);
 }
@@ -858,7 +859,8 @@ h2 {
     display: none;
   }
 
-  .leaflet-map {
+  .leaflet-map,
+  .maplibre-map {
     margin: 285px 0 0;
     width: 100%;
     height: calc(100% - 285px);
