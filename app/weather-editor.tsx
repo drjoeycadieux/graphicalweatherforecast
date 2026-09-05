@@ -29,7 +29,8 @@ const hazards: { value: Hazard; short: string }[] = [
   { value: "Hail", short: "HAIL" },
 ];
 
-const OPENFREEMAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
+const OPENFREEMAP_STYLE = "https://tiles.openfreemap.org/styles/bright";
+const US_STATES_GEOJSON = "https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json";
 
 type PolygonFeature = {
   type: "Feature";
@@ -57,6 +58,12 @@ const polygonOutlineLayer = {
   id: "outlook-outline",
   type: "line" as const,
   paint: { "line-color": ["get", "outline"] as unknown as string, "line-width": 2 },
+};
+
+const stateBoundaryLayer = {
+  id: "us-state-boundaries",
+  type: "line" as const,
+  paint: { "line-color": "#313131", "line-width": 1.1 },
 };
 
 function DraftPolygon({ draft, category }: { draft: [number, number][]; category: RiskCategory }) {
@@ -168,6 +175,9 @@ export default function WeatherEditor() {
           }}
         >
           <NavigationControl position="top-right" />
+          <Source id="us-states" type="geojson" data={US_STATES_GEOJSON}>
+            <Layer {...stateBoundaryLayer} />
+          </Source>
           <Source id="saved-outlooks" type="geojson" data={savedPolygonData}>
             <Layer {...polygonFillLayer} />
             <Layer {...polygonOutlineLayer} />
