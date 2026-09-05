@@ -549,6 +549,9 @@ h2 {
 .editor-rail {
   position: absolute;
   z-index: 600;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
   top: 0;
   left: 0;
   bottom: 0;
@@ -558,6 +561,10 @@ h2 {
   color: #f5f8f8;
   box-shadow: 8px 0 24px rgba(15, 29, 37, 0.2);
 }
+
+.editor-rail::-webkit-scrollbar { width: 7px; }
+.editor-rail::-webkit-scrollbar-track { background: #10242c; }
+.editor-rail::-webkit-scrollbar-thumb { border-radius: 4px; background: #42606a; }
 
 .rail-heading {
   display: grid;
@@ -610,6 +617,42 @@ h2 {
   display: grid;
   gap: 4px;
 }
+
+.hazard-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+}
+
+.hazard-tab {
+  display: grid;
+  gap: 3px;
+  min-height: 47px;
+  border: 1px solid #344b55;
+  border-radius: 3px;
+  background: #1b3039;
+  color: #b7c7ca;
+  padding: 7px 8px;
+  text-align: left;
+  font-size: 0.68rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.hazard-tab span {
+  color: #829da4;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+}
+
+.hazard-tab.active {
+  border-color: #e8b560;
+  background: #344d51;
+  color: #fff;
+}
+
+.hazard-tab.active span { color: #f3c977; }
 
 .category-button {
   display: flex;
@@ -689,6 +732,46 @@ h2 {
   font-size: 0.75rem;
 }
 
+.rail-user {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #30464f;
+}
+
+.rail-user-label {
+  color: #829da4;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.rail-user strong {
+  overflow: hidden;
+  color: #e3eded;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail-signout {
+  width: max-content;
+  margin-top: 5px;
+  border: 0;
+  background: transparent;
+  color: #dca16d;
+  padding: 0;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.rail-signout:hover { color: #f2c18b; text-decoration: underline; }
+
 .leaflet-map {
   margin-left: 270px;
   width: calc(100% - 270px);
@@ -712,6 +795,20 @@ h2 {
 .map-stamp strong {
   color: #13252c;
   font-size: 0.7rem;
+}
+
+.map-data-status {
+  position: absolute;
+  left: 288px;
+  bottom: 17px;
+  z-index: 500;
+  padding: 7px 10px;
+  border: 1px solid rgba(169, 184, 190, 0.8);
+  border-radius: 3px;
+  background: rgba(245, 248, 246, 0.92);
+  color: #53666c;
+  font-size: 0.68rem;
+  font-weight: 700;
 }
 
 @media (max-width: 768px) {
@@ -757,5 +854,10 @@ h2 {
 
   .map-stamp {
     top: 300px;
+  }
+
+  .map-data-status {
+    left: 12px;
+    bottom: 12px;
   }
 }

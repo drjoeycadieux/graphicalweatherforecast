@@ -6,7 +6,7 @@ Copy `.env.example` to `.env.local` and fill in the Firebase Web App configurati
 
 The app uses these Firestore collections:
 
-- `spc-outlooks`: outlook polygons with `day`, `category`, and `points` fields.
+- `spc-outlooks`: outlook polygons with `day`, `hazard`, `category`, and `points` fields. Hazards are `Severe Thunderstorms`, `Tornado`, `Wind`, and `Hail`.
 - `forecast-areas`: admin monitoring areas with `name`, `country`, and `detail` fields.
 
 When Firebase is not configured, the app intentionally shows empty states and disables editing. No forecast or monitoring data is bundled in the application.
