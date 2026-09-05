@@ -2,11 +2,11 @@
 
 import dynamic from "next/dynamic";
 
-const WeatherMap = dynamic(() => import("./weather-map"), {
+const WeatherEditor = dynamic(() => import("./weather-editor"), {
   ssr: false,
-  loading: () => <div className="map-loading">Loading forecast…</div>,
+  loading: () => <div className="map-loading">Loading SPC workspace...</div>,
 });
 
 export default function Home() {
-  return <WeatherMap />;
+  return <WeatherEditor />;
 }

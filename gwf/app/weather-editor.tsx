@@ -1,323 +1,123 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import type { LatLngExpression } from "leaflet";
-import { MapContainer, Polyline, TileLayer, useMapEvents } from "react-leaflet";
-import {
-  type User,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut,
-} from "firebase/auth";
+import { MapContainer, Polygon, TileLayer, useMapEvents } from "react-leaflet";
+import { type User, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { addDoc, collection, getDocs, orderBy, query, serverTimestamp } from "firebase/firestore";
 
 import { auth, db } from "@/lib/firebase";
 
-type LineRisk = "Marginal" | "Slight" | "Enhanced" | "Moderate" | "High" | "Extreme";
+type OutlookDay = 1 | 2 | 3;
+type RiskCategory = "General Thunder" | "Marginal" | "Slight" | "Enhanced" | "Moderate" | "High";
+type OutlookShape = { id?: string; day: OutlookDay; category: RiskCategory; points: [number, number][]; createdAt?: unknown; updatedAt?: unknown };
 
-type ForecastLine = {
-  id?: string;
-  kind: LineRisk;
-  name: string;
-  points: [number, number][];
-  createdAt?: any;
-  updatedAt?: any;
+const riskMeta: Record<RiskCategory, { color: string; ink: string; short: string }> = {
+  "General Thunder": { color: "#c9c9c9", ink: "#5d636b", short: "T" },
+  Marginal: { color: "#7fc97f", ink: "#28633c", short: "MRGL" },
+  Slight: { color: "#f5df62", ink: "#7a6500", short: "SLGT" },
+  Enhanced: { color: "#f6a257", ink: "#8a4309", short: "ENH" },
+  Moderate: { color: "#e86a6a", ink: "#7b2222", short: "MDT" },
+  High: { color: "#c14f88", ink: "#68183f", short: "HIGH" },
 };
 
-const riskColors: Record<LineRisk, string> = {
-  Marginal: "#8ecf9a",
-  Slight: "#f5d76e",
-  Enhanced: "#f9a65a",
-  Moderate: "#ea5a5a",
-  High: "#b53a7a",
-  Extreme: "#6b3d9f",
-};
-
-const canadaCenter: [number, number] = [56.13, -106.35];
-
-const starterLine: ForecastLine = {
-  kind: "Slight",
-  name: "Demo Line",
-  points: [
-    [49.5, -123.1],
-    [52.5, -116.7],
-    [55.8, -109.6],
-    [58.1, -101.8],
-  ],
-};
-
-function MapDrawLayer({
-  selectedKind,
-  onSave,
-  isDrawing,
-  draft,
-  setDraft,
-  canEdit,
-}: {
-  selectedKind: LineRisk;
-  onSave: (line: ForecastLine) => Promise<void>;
-  isDrawing: boolean;
-  draft: [number, number][];
-  setDraft: (points: [number, number][]) => void;
-  canEdit: boolean;
+function DrawLayer({ category, drawing, draft, setDraft, onSave, canEdit, day }: {
+  category: RiskCategory; drawing: boolean; draft: [number, number][]; setDraft: (points: [number, number][]) => void;
+  onSave: (shape: OutlookShape) => Promise<void>; canEdit: boolean; day: OutlookDay;
 }) {
-  useMapEvents({
-    click(event) {
-      if (!canEdit || !isDrawing) return;
-      const point: [number, number] = [event.latlng.lat, event.latlng.lng];
-      const next = [...draft, point];
-      setDraft(next);
-    },
-  });
+  useMapEvents({ click(event) {
+    if (canEdit && drawing) setDraft([...draft, [event.latlng.lat, event.latlng.lng]]);
+  } });
 
-  return (
-    <>
-      {draft.length > 1 && (
-        <Polyline
-          positions={draft as LatLngExpression[]}
-          pathOptions={{ color: riskColors[selectedKind], weight: 4, opacity: 0.95 }}
-        />
-      )}
-
-      {draft.length > 1 && (
-        <button
-          className="floating-save"
-          type="button"
-          onClick={() => {
-            if (draft.length < 2) return;
-            void onSave({
-              kind: selectedKind,
-              name: `${selectedKind} Line`,
-              points: draft,
-            });
-          }}
-        >
-          Save Line
-        </button>
-      )}
-    </>
-  );
+  return <>
+    {draft.length > 1 && <Polygon positions={draft as LatLngExpression[]} pathOptions={{ color: riskMeta[category].ink, fillColor: riskMeta[category].color, fillOpacity: 0.52, weight: 2, dashArray: "6 5" }} />}
+    {draft.length > 2 && <button className="floating-save" type="button" onClick={() => void onSave({ day, category, points: draft })}>Save Polygon</button>}
+  </>;
 }
 
 export default function WeatherEditor() {
-  const [lines, setLines] = useState<ForecastLine[]>([]);
-  const [selectedKind, setSelectedKind] = useState<LineRisk>("Slight");
+  const [shapes, setShapes] = useState<OutlookShape[]>([]);
+  const [selectedDay, setSelectedDay] = useState<OutlookDay>(1);
+  const [category, setCategory] = useState<RiskCategory>("Slight");
   const [draft, setDraft] = useState<[number, number][]>([]);
-  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawing, setDrawing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [dataError, setDataError] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [user, setUser] = useState<User | null>(null);
-  const [authReady, setAuthReady] = useState(false);
+  const [authReady, setAuthReady] = useState(!auth);
 
   useEffect(() => {
-    if (!auth) {
-      setAuthReady(true);
-      return;
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
-      setUser(nextUser);
-      setAuthReady(true);
-    });
-
-    return () => unsubscribe();
+    if (!auth) return;
+    return onAuthStateChanged(auth, (nextUser) => { setUser(nextUser); setAuthReady(true); });
   }, []);
 
   useEffect(() => {
-    const loadLines = async () => {
-      if (!db) {
-        setLines([starterLine]);
-        setLoading(false);
-        return;
-      }
-
+    const load = async () => {
+      if (!db) { setDataError("Connect Firebase to load and publish outlooks."); setLoading(false); return; }
       try {
-        const q = query(collection(db, "forecast-lines"), orderBy("createdAt", "asc"));
-        const snapshot = await getDocs(q);
-        const results = snapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as ForecastLine) }));
-        setLines(results.length ? results : [starterLine]);
-      } catch (error) {
-        console.error("Could not load forecast lines:", error);
-        setLines([starterLine]);
-      } finally {
-        setLoading(false);
-      }
+        const snapshot = await getDocs(query(collection(db, "spc-outlooks"), orderBy("createdAt", "asc")));
+        const results = snapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as OutlookShape) }));
+        setShapes(results);
+      } catch (error) { console.error("Could not load SPC outlooks:", error); setDataError("Firestore could not load outlooks."); }
+      finally { setLoading(false); }
     };
-
-    loadLines();
+    void load();
   }, []);
 
-  const canEdit = !auth || Boolean(user);
+  const canEdit = Boolean(db) && (!auth || Boolean(user));
+  const summary = useMemo(() => `${shapes.filter((shape) => shape.day === selectedDay).length} areas plotted`, [selectedDay, shapes]);
 
-  const handleLogin = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!auth) return;
-
+  const saveShape = async (shape: OutlookShape) => {
+    if (!canEdit || !db) return;
+    const clean = { ...shape, day: selectedDay, category, points: shape.points };
     try {
-      setAuthError("");
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to sign in.";
-      setAuthError(message);
-    }
+      const ref = await addDoc(collection(db, "spc-outlooks"), { ...clean, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      setShapes((current) => [...current, { ...clean, id: ref.id }]);
+      setDraft([]); setDrawing(false);
+    } catch (error) { console.error("Could not save SPC outlook:", error); setDataError("Firestore could not save this outlook."); }
   };
 
-  const handleLogout = async () => {
-    if (!auth) return;
-    await signOut(auth);
+  const login = async (event: React.FormEvent) => {
+    event.preventDefault(); if (!auth) return;
+    try { setAuthError(""); await signInWithEmailAndPassword(auth, email, password); }
+    catch (error) { setAuthError(error instanceof Error ? error.message : "Unable to sign in."); }
   };
 
-  const handleSaveLine = async (line: ForecastLine) => {
-    const localId = `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const clean = { ...line, points: line.points };
-
-    if (!canEdit) return;
-
-    setLines((prev) => [...prev, { ...clean, id: localId }]);
-    setDraft([]);
-    setIsDrawing(false);
-
-    if (!db) return;
-
-    try {
-      const ref = await addDoc(collection(db, "forecast-lines"), {
-        ...clean,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-
-      setLines((prev) => prev.map((item) => (item.id === localId ? { ...clean, id: ref.id } : item)));
-    } catch (error) {
-      console.error("Could not save to Firestore:", error);
-    }
+  const logout = async () => {
+    if (auth) await signOut(auth);
   };
 
-  const summary = useMemo(
-    () => `${lines.length} forecast line${lines.length > 1 ? "s" : ""} in view`,
-    [lines.length],
-  );
+  return <main className="page-shell">
+    <header className="forecast-header">
+      <div><p className="eyebrow">SPC outlook workstation</p><h1>Severe Weather Drawing Desk</h1></div>
+      <div className="forecast-badge"><span className="live-dot" /> NOAA / SPC style editor</div>
+    </header>
 
-  return (
-    <main className="page-shell">
-      {auth && !user && authReady ? (
-        <form className="auth-card" onSubmit={handleLogin}>
-          <h2>Editor access</h2>
-          <p>Sign in to edit the forecast map.</p>
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-          {authError ? <span className="auth-error">{authError}</span> : null}
-          <button type="submit" className="tool-button active">
-            Sign in
-          </button>
-        </form>
-      ) : null}
+    {auth && !user && authReady ? <form className="auth-card" onSubmit={login}><h2>Editor access</h2><p>Sign in to publish outlook shapes.</p><input type="email" placeholder="Email" value={email} onChange={(event) => setEmail(event.target.value)} /><input type="password" placeholder="Password" value={password} onChange={(event) => setPassword(event.target.value)} />{authError && <span className="auth-error">{authError}</span>}<button type="submit" className="tool-button active">Sign in</button><Link className="auth-link" href="/register">Create an editor account</Link></form> : null}
+    {auth && user ? <div className="map-user-badge"><span>{user.email}</span><button type="button" className="tool-button" onClick={() => void logout()}>Sign out</button></div> : null}
 
-      {auth && user ? (
-        <div className="map-user-badge">
-          <span>{user.email}</span>
-          <button type="button" className="tool-button" onClick={handleLogout}>
-            Sign out
-          </button>
-        </div>
-      ) : null}
-
-      {auth && !user && authReady ? null : (
-        <div className="map-shell">
-          <div className="action-bar">
-            <button
-              type="button"
-              className={isDrawing ? "tool-button active" : "tool-button"}
-              onClick={() => {
-                if (!canEdit) return;
-                setIsDrawing((value) => !value);
-                setDraft([]);
-              }}
-            >
-              {isDrawing ? "Stop Drawing" : "Start Drawing"}
-            </button>
-            <button type="button" className="tool-button" onClick={() => setDraft([])}>
-              Clear Draft
-            </button>
-            <div className="toolbar">
-              {(Object.keys(riskColors) as LineRisk[]).map((risk) => (
-                <button
-                  key={risk}
-                  type="button"
-                  className={selectedKind === risk ? "tool-button active" : "tool-button"}
-                  style={{ borderColor: riskColors[risk] }}
-                  onClick={() => setSelectedKind(risk)}
-                >
-                  {risk}
-                </button>
-              ))}
-            </div>
-            <span className="toolbar-status">{summary}</span>
-          </div>
-
-          {loading ? (
-            <div className="map-loading">Loading editor…</div>
-          ) : (
-            <>
-              <MapContainer
-                center={canadaCenter}
-                zoom={4}
-                minZoom={3}
-                maxZoom={8}
-                scrollWheelZoom
-                className="leaflet-map"
-                attributionControl={false}
-              >
-                <TileLayer
-                  url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png"
-                  attribution=""
-                />
-
-                {lines.map((line) => (
-                  <Polyline
-                    key={line.id ?? `${line.name}-${line.points.length}`}
-                    positions={line.points as LatLngExpression[]}
-                    pathOptions={{
-                      color: riskColors[line.kind],
-                      weight: line.kind === "Extreme" ? 6 : 4,
-                      opacity: 0.95,
-                    }}
-                  />
-                ))}
-
-                <MapDrawLayer
-                  selectedKind={selectedKind}
-                  onSave={handleSaveLine}
-                  isDrawing={isDrawing}
-                  draft={draft}
-                  setDraft={setDraft}
-                  canEdit={canEdit}
-                />
-              </MapContainer>
-
-              <div className="risk-legend" aria-label="Forecast line legend">
-                {(Object.keys(riskColors) as LineRisk[]).map((risk) => (
-                  <div key={risk} className="risk-legend-item">
-                    <span className="swatch" style={{ background: riskColors[risk] }} />
-                    <span>{risk}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      )}
-    </main>
-  );
+    {auth && !user && authReady ? null : <div className="map-shell">
+      <aside className="editor-rail">
+        <div className="rail-heading"><span className="section-kicker">Outlook period</span><strong>Valid forecast</strong></div>
+        <div className="day-tabs">{([1, 2, 3] as OutlookDay[]).map((day) => <button key={day} type="button" className={selectedDay === day ? "day-tab active" : "day-tab"} onClick={() => { setSelectedDay(day); setDraft([]); }}><span>DAY</span>{day}</button>)}</div>
+        <div className="rail-heading category-heading"><span className="section-kicker">Hazard category</span><strong>Convective risk</strong></div>
+        <div className="category-list">{(Object.keys(riskMeta) as RiskCategory[]).map((item) => <button key={item} type="button" className={category === item ? "category-button active" : "category-button"} style={{ "--category-color": riskMeta[item].color, "--category-ink": riskMeta[item].ink } as React.CSSProperties} onClick={() => setCategory(item)}><span className="category-swatch" />{item}<small>{riskMeta[item].short}</small></button>)}</div>
+        <div className="rail-actions"><button type="button" className={drawing ? "tool-button active" : "tool-button"} onClick={() => { setDrawing(!drawing); setDraft([]); }}>{drawing ? "Stop drawing" : "Draw polygon"}</button><button type="button" className="tool-button quiet" onClick={() => setDraft([])}>Clear draft</button></div>
+        <div className="rail-status"><span className="status-mark" />{dataError || (drawing ? "Click map to add vertices" : "Ready for edits")}<strong>{summary}</strong></div>
+      </aside>
+      {loading ? <div className="map-loading">Loading outlook workspace...</div> : <MapContainer center={[38.5, -96]} zoom={4} minZoom={3} maxZoom={8} scrollWheelZoom className="leaflet-map" attributionControl={false}>
+        <TileLayer
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        />
+        {shapes.filter((shape) => shape.day === selectedDay).map((shape) => <Polygon key={shape.id ?? shape.points.length} positions={shape.points as LatLngExpression[]} pathOptions={{ color: riskMeta[shape.category].ink, fillColor: riskMeta[shape.category].color, fillOpacity: 0.5, weight: 2 }} />)}
+        <DrawLayer category={category} drawing={drawing} draft={draft} setDraft={setDraft} onSave={saveShape} canEdit={canEdit} day={selectedDay} />
+      </MapContainer>}
+      <div className="map-stamp"><span>SPC DRAWING DESK</span><strong>DAY {selectedDay} / {category.toUpperCase()}</strong></div>
+    </div>}
+  </main>;
 }

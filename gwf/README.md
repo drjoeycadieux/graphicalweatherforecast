@@ -1,4 +1,15 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+This is a Leaflet and Firebase workspace for drawing SPC severe weather outlooks across Canada and the United States.
+
+## Firebase setup
+
+Copy `.env.example` to `.env.local` and fill in the Firebase Web App configuration values from the Firebase console. Enable Email/Password Authentication and create a Firestore database.
+
+The app uses these Firestore collections:
+
+- `spc-outlooks`: outlook polygons with `day`, `category`, and `points` fields.
+- `forecast-areas`: admin monitoring areas with `name`, `country`, and `detail` fields.
+
+When Firebase is not configured, the app intentionally shows empty states and disables editing. No forecast or monitoring data is bundled in the application.
 
 ## Getting Started
 
