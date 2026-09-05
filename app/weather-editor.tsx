@@ -9,6 +9,7 @@ import { addDoc, collection, getDocs, orderBy, query, serverTimestamp } from "fi
 import { auth, db } from "@/lib/firebase";
 
 type OutlookDay = 1 | 2 | 3;
+type MapRegion = "USA" | "Quebec";
 type Hazard = "Severe Thunderstorms" | "Tornado" | "Wind" | "Hail";
 type RiskCategory = "General Thunder" | "Marginal" | "Slight" | "Enhanced" | "Moderate" | "High";
 type OutlookShape = { id?: string; day: OutlookDay; hazard: Hazard; category: RiskCategory; points: [number, number][]; createdAt?: unknown; updatedAt?: unknown };
@@ -28,6 +29,11 @@ const hazards: { value: Hazard; short: string }[] = [
   { value: "Wind", short: "WND" },
   { value: "Hail", short: "HAIL" },
 ];
+
+const regionViews: Record<MapRegion, { longitude: number; latitude: number; zoom: number }> = {
+  USA: { longitude: -96, latitude: 38.5, zoom: 4 },
+  Quebec: { longitude: -72, latitude: 51.5, zoom: 5 },
+};
 
 const POLITICAL_MAP_STYLE = {
   version: 8 as const,
@@ -95,6 +101,7 @@ function DraftPolygon({ draft, category }: { draft: [number, number][]; category
 export default function WeatherEditor() {
   const [shapes, setShapes] = useState<OutlookShape[]>([]);
   const [selectedDay, setSelectedDay] = useState<OutlookDay>(1);
+  const [region, setRegion] = useState<MapRegion>("USA");
   const [hazard, setHazard] = useState<Hazard>("Severe Thunderstorms");
   const [category, setCategory] = useState<RiskCategory>("Slight");
   const [draft, setDraft] = useState<[number, number][]>([]);
@@ -174,6 +181,8 @@ export default function WeatherEditor() {
         {auth && user ? <div className="rail-user"><span className="rail-user-label">Signed in as</span><strong>{user.email}</strong><button type="button" className="rail-signout" onClick={() => void logout()}>Sign out</button></div> : null}
         <div className="rail-heading"><span className="section-kicker">Outlook period</span><strong>Valid forecast</strong></div>
         <div className="day-tabs">{([1, 2, 3] as OutlookDay[]).map((day) => <button key={day} type="button" className={selectedDay === day ? "day-tab active" : "day-tab"} onClick={() => { setSelectedDay(day); setDraft([]); }}><span>DAY</span>{day}</button>)}</div>
+        <div className="rail-heading category-heading"><span className="section-kicker">Map region</span><strong>Forecast area</strong></div>
+        <div className="region-tabs">{(["USA", "Quebec"] as MapRegion[]).map((item) => <button key={item} type="button" className={region === item ? "region-tab active" : "region-tab"} onClick={() => { setRegion(item); setDraft([]); }}>{item}</button>)}</div>
         <div className="rail-heading category-heading"><span className="section-kicker">Outlook type</span><strong>Hazard</strong></div>
         <div className="hazard-tabs">{hazards.map((item) => <button key={item.value} type="button" className={hazard === item.value ? "hazard-tab active" : "hazard-tab"} onClick={() => { setHazard(item.value); setDraft([]); }}><span>{item.short}</span>{item.value === "Severe Thunderstorms" ? "Severe" : item.value}</button>)}</div>
         <div className="rail-heading category-heading"><span className="section-kicker">Risk category</span><strong>Convective probability</strong></div>
@@ -183,7 +192,8 @@ export default function WeatherEditor() {
       </aside>
       <div className="maplibre-map">
         <Map
-          initialViewState={{ longitude: -96, latitude: 38.5, zoom: 4 }}
+          key={region}
+          initialViewState={regionViews[region]}
           minZoom={3}
           maxZoom={8}
           mapStyle={POLITICAL_MAP_STYLE}

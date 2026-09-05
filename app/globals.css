@@ -625,6 +625,33 @@ h2 {
   border-color: #ecf2ed;
 }
 
+.region-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.region-tab {
+  border: 1px solid #29434d;
+  border-radius: 3px;
+  background: #162e38;
+  color: #a9bec4;
+  padding: 9px 6px;
+  font: inherit;
+  font-size: 0.69rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.region-tab.active {
+  border-color: #d3a557;
+  background: #304850;
+  color: #fff1c9;
+}
+
 .category-list {
   display: grid;
   gap: 4px;
