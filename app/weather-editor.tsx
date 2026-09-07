@@ -40,7 +40,7 @@ const regionViews: Record<MapRegion, { longitude: number; latitude: number; zoom
 const POLITICAL_MAP_STYLE = {
   version: 8 as const,
   sources: {},
-  layers: [{ id: "political-background", type: "background" as const, paint: { "background-color": "#7fa3c8" } }],
+  layers: [{ id: "political-background", type: "background" as const, paint: { "background-color": "#e7dfd1" } }],
 };
 const US_COUNTRIES_GEOJSON = "/api/map-data/countries";
 const US_STATES_GEOJSON = "/api/map-data/states";
@@ -76,19 +76,19 @@ const polygonOutlineLayer = {
 const stateBoundaryLayer = {
   id: "us-state-boundaries",
   type: "line" as const,
-  paint: { "line-color": "#313131", "line-width": 1.1 },
+  paint: { "line-color": "#6f675b", "line-width": 1.1 },
 };
 
 const stateFillLayer = {
   id: "us-state-fills",
   type: "fill" as const,
-  paint: { "fill-color": "#f2ede2", "fill-opacity": 1 },
+  paint: { "fill-color": "#f6efe3", "fill-opacity": 1 },
 };
 
 const countryFillLayer = {
   id: "country-fills",
   type: "fill" as const,
-  paint: { "fill-color": "#858585", "fill-opacity": 1 },
+  paint: { "fill-color": "#c9c0b1", "fill-opacity": 1 },
 };
 
 function PoliticalMap({ region, countryData, stateData, savedPolygonData, draft, category, onMapClick }: {
