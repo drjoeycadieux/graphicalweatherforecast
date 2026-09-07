@@ -99,6 +99,7 @@ function PoliticalMap({ region, countryData, stateData, savedPolygonData, draft,
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!countryData || !stateData) return;
     const container = containerRef.current;
     if (!container) return;
     const view = regionViews[region];
@@ -106,15 +107,11 @@ function PoliticalMap({ region, countryData, stateData, savedPolygonData, draft,
     map.addControl(new NavigationControl(), "top-right");
     map.on("click", (event) => onMapClick([event.lngLat.lat, event.lngLat.lng]));
     map.on("load", () => {
-      if (countryData) {
-        map.addSource("countries", { type: "geojson", data: countryData });
-        map.addLayer({ ...countryFillLayer, source: "countries" });
-      }
-      if (stateData) {
-        map.addSource("states", { type: "geojson", data: stateData });
-        map.addLayer({ ...stateFillLayer, source: "states" });
-        map.addLayer({ ...stateBoundaryLayer, source: "states" });
-      }
+      map.addSource("countries", { type: "geojson", data: countryData });
+      map.addLayer({ ...countryFillLayer, source: "countries" });
+      map.addSource("states", { type: "geojson", data: stateData });
+      map.addLayer({ ...stateFillLayer, source: "states" });
+      map.addLayer({ ...stateBoundaryLayer, source: "states" });
       map.addSource("saved-outlooks", { type: "geojson", data: savedPolygonData });
       map.addLayer({ ...polygonFillLayer, source: "saved-outlooks" });
       map.addLayer({ ...polygonOutlineLayer, source: "saved-outlooks" });
@@ -127,6 +124,10 @@ function PoliticalMap({ region, countryData, stateData, savedPolygonData, draft,
     });
     return () => map.remove();
   }, []);
+
+  if (!countryData || !stateData) {
+    return <div className="maplibre-canvas map-loading">Loading political map...</div>;
+  }
 
   return <div ref={containerRef} className="maplibre-canvas" />;
 }
