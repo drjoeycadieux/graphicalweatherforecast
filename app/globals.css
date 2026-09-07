@@ -304,20 +304,10 @@ h2 {
   background: #e5e7eb;
 }
 
-.maplibre-map {
+.leaflet-map-shell {
   width: 100%;
   height: 100%;
   background: #e5e7eb;
-}
-
-.maplibre-map .maplibregl-map {
-  width: 100%;
-  height: 100%;
-}
-
-.maplibre-canvas {
-  width: 100%;
-  height: 100%;
 }
 
 .floating-save {

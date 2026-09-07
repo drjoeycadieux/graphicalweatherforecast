@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { FeatureCollection, Geometry, GeoJsonProperties } from "geojson";
-import { Map as MapLibreMap, NavigationControl } from "maplibre-gl";
+import { GeoJSON, MapContainer, Polygon, Polyline, TileLayer, useMapEvents } from "react-leaflet";
 import { type User, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { addDoc, collection, getDocs, orderBy, query, serverTimestamp } from "firebase/firestore";
 
@@ -37,11 +37,6 @@ const regionViews: Record<MapRegion, { longitude: number; latitude: number; zoom
   Quebec: { longitude: -72, latitude: 51.5, zoom: 5 },
 };
 
-const POLITICAL_MAP_STYLE = {
-  version: 8 as const,
-  sources: {},
-  layers: [{ id: "political-background", type: "background" as const, paint: { "background-color": "#7fa3c8" } }],
-};
 const US_COUNTRIES_GEOJSON = "/api/map-data/countries";
 const US_STATES_GEOJSON = "/api/map-data/states";
 
@@ -61,76 +56,35 @@ function polygonCollection(features: PolygonFeature[]) {
   return { type: "FeatureCollection" as const, features };
 }
 
-const polygonFillLayer = {
-  id: "outlook-fill",
-  type: "fill" as const,
-  paint: { "fill-color": ["get", "fill"] as unknown as string, "fill-opacity": ["get", "opacity"] as unknown as number },
-};
-
-const polygonOutlineLayer = {
-  id: "outlook-outline",
-  type: "line" as const,
-  paint: { "line-color": ["get", "outline"] as unknown as string, "line-width": 2 },
-};
-
-const stateBoundaryLayer = {
-  id: "us-state-boundaries",
-  type: "line" as const,
-  paint: { "line-color": "#313131", "line-width": 1.1 },
-};
-
-const stateFillLayer = {
-  id: "us-state-fills",
-  type: "fill" as const,
-  paint: { "fill-color": "#f2ede2", "fill-opacity": 1 },
-};
-
-const countryFillLayer = {
-  id: "country-fills",
-  type: "fill" as const,
-  paint: { "fill-color": "#858585", "fill-opacity": 1 },
-};
+function MapClickHandler({ onMapClick }: { onMapClick: (point: [number, number]) => void }) {
+  useMapEvents({ click: (event) => onMapClick([event.latlng.lat, event.latlng.lng]) });
+  return null;
+}
 
 function PoliticalMap({ region, countryData, stateData, savedPolygonData, draft, category, onMapClick }: {
   region: MapRegion; countryData: GeoJsonCollection | null; stateData: GeoJsonCollection | null;
   savedPolygonData: ReturnType<typeof polygonCollection>; draft: [number, number][];
   category: RiskCategory; onMapClick: (point: [number, number]) => void;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const view = regionViews[region];
+  const savedPolygons = savedPolygonData.features.map((feature) => ({
+    positions: feature.geometry.coordinates[0].map(([longitude, latitude]) => [latitude, longitude] as [number, number]),
+    color: feature.properties.outline,
+    fillColor: feature.properties.fill,
+  }));
 
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const view = regionViews[region];
-    const map = new MapLibreMap({ container, style: POLITICAL_MAP_STYLE, center: [view.longitude, view.latitude], zoom: view.zoom, minZoom: 3, maxZoom: 8 });
-    map.addControl(new NavigationControl(), "top-right");
-    map.on("click", (event) => onMapClick([event.lngLat.lat, event.lngLat.lng]));
-    map.on("load", () => {
-      if (countryData) {
-        map.addSource("countries", { type: "geojson", data: countryData });
-        map.addLayer({ ...countryFillLayer, source: "countries" });
-      }
-      if (stateData) {
-        map.addSource("states", { type: "geojson", data: stateData });
-        map.addLayer({ ...stateFillLayer, source: "states" });
-        map.addLayer({ ...stateBoundaryLayer, source: "states" });
-      }
-      map.addSource("saved-outlooks", { type: "geojson", data: savedPolygonData });
-      map.addLayer({ ...polygonFillLayer, source: "saved-outlooks" });
-      map.addLayer({ ...polygonOutlineLayer, source: "saved-outlooks" });
-      if (draft.length > 1) {
-        const draftData = draft.length > 2 ? polygonCollection([polygonFeature(draft, riskMeta[category].color, riskMeta[category].ink, 0.52)]) : { type: "FeatureCollection" as const, features: [{ type: "Feature" as const, geometry: { type: "LineString" as const, coordinates: draft.map(([lat, lng]) => [lng, lat]) }, properties: {} }] };
-        map.addSource("draft-outlook", { type: "geojson", data: draftData });
-        if (draft.length > 2) map.addLayer({ ...polygonFillLayer, id: "draft-fill", source: "draft-outlook" });
-        map.addLayer({ ...polygonOutlineLayer, id: "draft-outline", source: "draft-outlook", paint: { "line-color": riskMeta[category].ink, "line-width": 2, "line-dasharray": [3, 3] } });
-      }
-    });
-    return () => map.remove();
-    // The keyed component remounts when map inputs change; recreate the map once per mount.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  return <div ref={containerRef} className="maplibre-canvas" />;
+  return <MapContainer center={[view.latitude, view.longitude]} zoom={view.zoom} minZoom={3} maxZoom={8} scrollWheelZoom className="leaflet-map">
+    <TileLayer
+      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+    />
+    {countryData ? <GeoJSON data={countryData} style={{ color: "#4b5563", weight: 1, fillColor: "#858585", fillOpacity: 1 }} /> : null}
+    {stateData ? <GeoJSON data={stateData} style={{ color: "#313131", weight: 1, fillColor: "#f2ede2", fillOpacity: 1 }} /> : null}
+    {savedPolygons.map((polygon, index) => <Polygon key={`saved-${index}`} positions={polygon.positions} pathOptions={{ color: polygon.color, fillColor: polygon.fillColor, fillOpacity: 0.5, weight: 2 }} />)}
+    {draft.length > 1 ? <Polyline positions={draft} pathOptions={{ color: riskMeta[category].ink, weight: 2, dashArray: "6 5" }} /> : null}
+    {draft.length > 2 ? <Polygon positions={draft} pathOptions={{ color: riskMeta[category].ink, fillColor: riskMeta[category].color, fillOpacity: 0.52, weight: 2, dashArray: "6 5" }} /> : null}
+    <MapClickHandler onMapClick={onMapClick} />
+  </MapContainer>;
 }
 
 export default function WeatherEditor() {
@@ -245,7 +199,7 @@ export default function WeatherEditor() {
         <div className="rail-actions"><button type="button" className={drawing ? "tool-button active" : "tool-button"} onClick={() => { setDrawing(!drawing); setDraft([]); }}>{drawing ? "Stop drawing" : "Draw polygon"}</button><button type="button" className="tool-button quiet" onClick={() => setDraft([])}>Clear draft</button></div>
         <div className="rail-status"><span className="status-mark" />{dataError || (drawing ? "Click map to add vertices" : "Ready for edits")}<strong>{summary} · {hazard}</strong></div>
       </aside>
-      <div className="maplibre-map">
+      <div className="leaflet-map-shell">
         <PoliticalMap
           key={`${region}-${countryData ? "ready" : "loading"}-${stateData ? "ready" : "loading"}`}
           region={region}
