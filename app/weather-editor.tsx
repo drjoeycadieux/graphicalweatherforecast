@@ -107,11 +107,11 @@ function PoliticalMap({ region, countryData, stateData, savedPolygonData, draft,
     map.addControl(new NavigationControl(), "top-right");
     map.on("click", (event) => onMapClick([event.lngLat.lat, event.lngLat.lng]));
     map.on("load", () => {
-      map.addSource("countries", { type: "geojson", data: countryData });
-      map.addLayer({ ...countryFillLayer, source: "countries" });
       map.addSource("states", { type: "geojson", data: stateData });
       map.addLayer({ ...stateFillLayer, source: "states" });
       map.addLayer({ ...stateBoundaryLayer, source: "states" });
+      map.addSource("countries", { type: "geojson", data: countryData });
+      map.addLayer({ ...countryFillLayer, source: "countries" }, "us-state-fills");
       map.addSource("saved-outlooks", { type: "geojson", data: savedPolygonData });
       map.addLayer({ ...polygonFillLayer, source: "saved-outlooks" });
       map.addLayer({ ...polygonOutlineLayer, source: "saved-outlooks" });
