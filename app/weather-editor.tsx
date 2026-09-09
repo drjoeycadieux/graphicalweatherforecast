@@ -74,7 +74,7 @@ function polygonCollection(features: PolygonFeature[]) {
 
 function PoliticalMap({ region, selectedDay, drawMode, countryData, stateData, quebecData, savedPolygonData, draft, category, onMapClick, onFreehandComplete }: {
   selectedDay: OutlookDay;
-  drawMode: "polygon" | "pencil" | "rectangle";
+  drawMode: "polygon" | "pencil" | "rectangle" | "quick";
   region: MapRegion; countryData: GeoJsonCollection | null; stateData: GeoJsonCollection | null; quebecData: GeoJsonCollection | null;
   savedPolygonData: ReturnType<typeof polygonCollection>; draft: [number, number][];
   category: RiskCategory; onMapClick: (point: [number, number]) => void; onFreehandComplete: (points: [number, number][]) => void;
@@ -143,9 +143,13 @@ function PoliticalMap({ region, selectedDay, drawMode, countryData, stateData, q
     viewport.addEventListener("pointermove", handlePointerMove);
     viewport.addEventListener("pointerup", handlePointerUp);
     map.on("click", (event) => {
-      if (drawMode !== "polygon") return;
       const [longitude, latitude] = toLonLat(event.coordinate);
-      onMapClick([latitude, longitude]);
+      if (drawMode === "polygon") onMapClick([latitude, longitude]);
+      if (drawMode === "quick") {
+        const latitudeSize = 1.2;
+        const longitudeSize = 1.8;
+        onFreehandComplete([[latitude - latitudeSize, longitude - longitudeSize], [latitude - latitudeSize, longitude + longitudeSize], [latitude + latitudeSize, longitude + longitudeSize], [latitude + latitudeSize, longitude - longitudeSize]]);
+      }
     });
     return () => { viewport.removeEventListener("pointerdown", handlePointerDown); viewport.removeEventListener("pointermove", handlePointerMove); viewport.removeEventListener("pointerup", handlePointerUp); map.setTarget(undefined); mapRef.current = null; };
   }, [category, countryData, draft, drawMode, onFreehandComplete, onMapClick, quebecData, region, savedPolygonData, stateData]);
@@ -189,7 +193,7 @@ export default function WeatherEditor() {
   const [category, setCategory] = useState<RiskCategory>("Slight");
   const [draft, setDraft] = useState<[number, number][]>([]);
   const [drawing, setDrawing] = useState(false);
-  const [drawMode, setDrawMode] = useState<"polygon" | "pencil" | "rectangle">("polygon");
+  const [drawMode, setDrawMode] = useState<"polygon" | "pencil" | "rectangle" | "quick">("polygon");
   const [loading, setLoading] = useState(true);
   const [dataError, setDataError] = useState("");
   const [email, setEmail] = useState("");
@@ -293,7 +297,7 @@ export default function WeatherEditor() {
         <div className="hazard-tabs">{hazards.map((item) => <button key={item.value} type="button" className={hazard === item.value ? "hazard-tab active" : "hazard-tab"} onClick={() => { setHazard(item.value); setDraft([]); }}><span>{item.short}</span>{item.value === "Severe Thunderstorms" ? "Severe" : item.value}</button>)}</div>
         <div className="rail-heading category-heading"><span className="section-kicker">Risk category</span><strong>Convective probability</strong></div>
         <div className="category-list">{(Object.keys(riskMeta) as RiskCategory[]).map((item) => <button key={item} type="button" className={category === item ? "category-button active" : "category-button"} style={{ "--category-color": riskMeta[item].color, "--category-ink": riskMeta[item].ink } as React.CSSProperties} onClick={() => setCategory(item)}><span className="category-swatch" />{item}<small>{riskMeta[item].short}</small></button>)}</div>
-        <div className="rail-actions"><button type="button" className={drawing && drawMode === "polygon" ? "tool-button active" : "tool-button"} onClick={() => { setDrawMode("polygon"); setDrawing(!drawing); setDraft([]); }}>{drawing && drawMode === "polygon" ? "Stop drawing" : "Draw polygon"}</button><button type="button" className={drawing && drawMode === "pencil" ? "tool-button active" : "tool-button"} onClick={() => { setDrawMode("pencil"); setDrawing(true); setDraft([]); }}>Pencil</button><button type="button" className={drawing && drawMode === "rectangle" ? "tool-button active" : "tool-button"} onClick={() => { setDrawMode("rectangle"); setDrawing(true); setDraft([]); }}>Rectangle</button><button type="button" className="tool-button quiet" onClick={() => setDraft([])}>Clear draft</button></div>
+        <div className="rail-actions"><button type="button" className={drawing && drawMode === "polygon" ? "tool-button active" : "tool-button"} onClick={() => { setDrawMode("polygon"); setDrawing(!drawing); setDraft([]); }}>{drawing && drawMode === "polygon" ? "Stop drawing" : "Draw polygon"}</button><button type="button" className={drawing && drawMode === "pencil" ? "tool-button active" : "tool-button"} onClick={() => { setDrawMode("pencil"); setDrawing(true); setDraft([]); }}>Pencil</button><button type="button" className={drawing && drawMode === "rectangle" ? "tool-button active" : "tool-button"} onClick={() => { setDrawMode("rectangle"); setDrawing(true); setDraft([]); }}>Rectangle</button><button type="button" className={drawing && drawMode === "quick" ? "tool-button active" : "tool-button"} onClick={() => { setDrawMode("quick"); setDrawing(true); setDraft([]); }}>Quick area</button><button type="button" className="tool-button quiet" onClick={() => setDraft([])}>Clear draft</button></div>
         <div className="rail-status"><span className="status-mark" />{dataError || (drawing ? "Click map to add vertices" : "Ready for edits")}<strong>{summary} · {hazard}</strong></div>
       </aside>
       <div className="maplibre-map">
