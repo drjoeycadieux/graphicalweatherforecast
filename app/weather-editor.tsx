@@ -270,7 +270,7 @@ export default function WeatherEditor() {
           savedPolygonData={savedPolygonData}
           draft={draft}
           category={category}
-          onMapClick={(point) => { if (canEdit && drawing) setDraft([...draft, point]); }}
+          onMapClick={(point) => { if (drawing) setDraft([...draft, point]); }}
         />
       </div>
       {draft.length > 2 && <button className="floating-save" type="button" onClick={() => void saveShape({ day: selectedDay, hazard, category, points: draft })}>Save Polygon</button>}
