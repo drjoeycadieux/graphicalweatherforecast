@@ -324,8 +324,8 @@ h2 {
 .map-export-button {
   position: absolute;
   top: 16px;
-  right: 16px;
-  z-index: 500;
+  right: 250px;
+  z-index: 700;
   border: 1px solid rgba(25, 59, 74, 0.25);
   border-radius: 8px;
   padding: 9px 12px;
@@ -418,6 +418,11 @@ h2 {
 
   .leaflet-map {
     height: 620px;
+  }
+
+  .map-export-button {
+    top: 58px;
+    right: 16px;
   }
 
   .risk-legend {
