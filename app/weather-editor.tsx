@@ -3,7 +3,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { FeatureCollection, Geometry, GeoJsonProperties } from "geojson";
-import { Map as MapLibreMap, NavigationControl } from "maplibre-gl";
+import "ol/ol.css";
+import Feature from "ol/Feature.js";
+import GeoJSON from "ol/format/GeoJSON.js";
+import Map from "ol/Map.js";
+import View from "ol/View.js";
+import { fromLonLat, toLonLat } from "ol/proj.js";
+import LineString from "ol/geom/LineString.js";
+import Polygon from "ol/geom/Polygon.js";
+import Fill from "ol/style/Fill.js";
+import Stroke from "ol/style/Stroke.js";
+import Style from "ol/style/Style.js";
+import VectorLayer from "ol/layer/Vector.js";
+import VectorSource from "ol/source/Vector.js";
+import TileLayer from "ol/layer/Tile.js";
+import OSM from "ol/source/OSM.js";
 import { type User, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { addDoc, collection, getDocs, orderBy, query, serverTimestamp } from "firebase/firestore";
 
@@ -37,11 +51,6 @@ const regionViews: Record<MapRegion, { longitude: number; latitude: number; zoom
   Quebec: { longitude: -72, latitude: 51.5, zoom: 5 },
 };
 
-const POLITICAL_MAP_STYLE = {
-  version: 8 as const,
-  sources: {},
-  layers: [{ id: "political-background", type: "background" as const, paint: { "background-color": "#e7dfd1" } }],
-};
 const US_COUNTRIES_GEOJSON = "/api/map-data/countries";
 const US_STATES_GEOJSON = "/api/map-data/states";
 
@@ -61,36 +70,6 @@ function polygonCollection(features: PolygonFeature[]) {
   return { type: "FeatureCollection" as const, features };
 }
 
-const polygonFillLayer = {
-  id: "outlook-fill",
-  type: "fill" as const,
-  paint: { "fill-color": ["get", "fill"] as unknown as string, "fill-opacity": ["get", "opacity"] as unknown as number },
-};
-
-const polygonOutlineLayer = {
-  id: "outlook-outline",
-  type: "line" as const,
-  paint: { "line-color": ["get", "outline"] as unknown as string, "line-width": 2 },
-};
-
-const stateBoundaryLayer = {
-  id: "us-state-boundaries",
-  type: "line" as const,
-  paint: { "line-color": "#6f675b", "line-width": 1.1 },
-};
-
-const stateFillLayer = {
-  id: "us-state-fills",
-  type: "fill" as const,
-  paint: { "fill-color": "#f6efe3", "fill-opacity": 1 },
-};
-
-const countryFillLayer = {
-  id: "country-fills",
-  type: "fill" as const,
-  paint: { "fill-color": "#c9c0b1", "fill-opacity": 1 },
-};
-
 function PoliticalMap({ region, countryData, stateData, savedPolygonData, draft, category, onMapClick }: {
   region: MapRegion; countryData: GeoJsonCollection | null; stateData: GeoJsonCollection | null;
   savedPolygonData: ReturnType<typeof polygonCollection>; draft: [number, number][];
@@ -103,33 +82,29 @@ function PoliticalMap({ region, countryData, stateData, savedPolygonData, draft,
     const container = containerRef.current;
     if (!container) return;
     const view = regionViews[region];
-    const map = new MapLibreMap({ container, style: POLITICAL_MAP_STYLE, center: [view.longitude, view.latitude], zoom: view.zoom, minZoom: 3, maxZoom: 8 });
-    map.addControl(new NavigationControl(), "top-right");
-    map.on("click", (event) => onMapClick([event.lngLat.lat, event.lngLat.lng]));
-    map.on("load", () => {
-      map.addSource("states", { type: "geojson", data: stateData });
-      map.addLayer({ ...stateFillLayer, source: "states" });
-      map.addLayer({ ...stateBoundaryLayer, source: "states" });
-      map.addSource("countries", { type: "geojson", data: countryData });
-      map.addLayer({ ...countryFillLayer, source: "countries" }, "us-state-fills");
-      map.addSource("saved-outlooks", { type: "geojson", data: savedPolygonData });
-      map.addLayer({ ...polygonFillLayer, source: "saved-outlooks" });
-      map.addLayer({ ...polygonOutlineLayer, source: "saved-outlooks" });
-      if (draft.length > 1) {
-        const draftData = draft.length > 2 ? polygonCollection([polygonFeature(draft, riskMeta[category].color, riskMeta[category].ink, 0.52)]) : { type: "FeatureCollection" as const, features: [{ type: "Feature" as const, geometry: { type: "LineString" as const, coordinates: draft.map(([lat, lng]) => [lng, lat]) }, properties: {} }] };
-        map.addSource("draft-outlook", { type: "geojson", data: draftData });
-        if (draft.length > 2) map.addLayer({ ...polygonFillLayer, id: "draft-fill", source: "draft-outlook" });
-        map.addLayer({ ...polygonOutlineLayer, id: "draft-outline", source: "draft-outlook", paint: { "line-color": riskMeta[category].ink, "line-width": 2, "line-dasharray": [3, 3] } });
-      }
-    });
-    return () => map.remove();
-  }, []);
+    const geoJson = new GeoJSON();
+    const boundaryStyle = (fill: string, stroke: string, width: number) => new Style({ fill: new Fill({ color: fill }), stroke: new Stroke({ color: stroke, width }) });
+    const countryLayer = new VectorLayer({ source: new VectorSource({ features: geoJson.readFeatures(countryData, { featureProjection: "EPSG:3857" }) }), style: boundaryStyle("#c9c0b1", "#8e8577", 1) });
+    const stateLayer = new VectorLayer({ source: new VectorSource({ features: geoJson.readFeatures(stateData, { featureProjection: "EPSG:3857" }) }), style: boundaryStyle("#f6efe3", "#6f675b", 1.1) });
+    const savedSource = new VectorSource({ features: geoJson.readFeatures(savedPolygonData, { featureProjection: "EPSG:3857" }) });
+    const savedLayer = new VectorLayer({ source: savedSource, style: (feature) => boundaryStyle(String(feature.get("fill") ?? "#f5df62"), String(feature.get("outline") ?? "#7a6500"), 2) });
+    const draftSource = new VectorSource();
+    if (draft.length > 2) {
+      draftSource.addFeature(new Feature({ geometry: new Polygon([[...draft.map(([lat, lng]) => fromLonLat([lng, lat])), fromLonLat([draft[0][1], draft[0][0]])]]), fill: riskMeta[category].color, outline: riskMeta[category].ink }));
+    } else if (draft.length > 1) {
+      draftSource.addFeature(new Feature({ geometry: new LineString(draft.map(([lat, lng]) => fromLonLat([lng, lat]))), outline: riskMeta[category].ink }));
+    }
+    const draftLayer = new VectorLayer({ source: draftSource, style: (feature) => new Style({ fill: new Fill({ color: `${feature.get("fill") ?? "#f5df62"}85` }), stroke: new Stroke({ color: String(feature.get("outline") ?? riskMeta[category].ink), width: 2, lineDash: [6, 5] }) }) });
+    const map = new Map({ target: container, layers: [new TileLayer({ source: new OSM() }), countryLayer, stateLayer, savedLayer, draftLayer], view: new View({ center: fromLonLat([view.longitude, view.latitude]), zoom: view.zoom, minZoom: 3, maxZoom: 8 }) });
+    map.on("click", (event) => { const [longitude, latitude] = toLonLat(event.coordinate); onMapClick([latitude, longitude]); });
+    return () => map.setTarget(undefined);
+  }, [category, countryData, draft, onMapClick, region, savedPolygonData, stateData]);
 
   if (!countryData || !stateData) {
     return <div className="maplibre-canvas map-loading">Loading political map...</div>;
   }
 
-  return <div ref={containerRef} className="maplibre-canvas" />;
+  return <div ref={containerRef} className="maplibre-canvas openlayers-canvas" />;
 }
 
 export default function WeatherEditor() {
