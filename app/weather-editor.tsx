@@ -72,11 +72,12 @@ function polygonCollection(features: PolygonFeature[]) {
   return { type: "FeatureCollection" as const, features };
 }
 
-function PoliticalMap({ region, selectedDay, countryData, stateData, quebecData, savedPolygonData, draft, category, onMapClick }: {
+function PoliticalMap({ region, selectedDay, freehand, countryData, stateData, quebecData, savedPolygonData, draft, category, onMapClick, onFreehandComplete }: {
   selectedDay: OutlookDay;
+  freehand: boolean;
   region: MapRegion; countryData: GeoJsonCollection | null; stateData: GeoJsonCollection | null; quebecData: GeoJsonCollection | null;
   savedPolygonData: ReturnType<typeof polygonCollection>; draft: [number, number][];
-  category: RiskCategory; onMapClick: (point: [number, number]) => void;
+  category: RiskCategory; onMapClick: (point: [number, number]) => void; onFreehandComplete: (points: [number, number][]) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
@@ -110,9 +111,39 @@ function PoliticalMap({ region, selectedDay, countryData, stateData, quebecData,
     });
     const map = new Map({ target: container, layers: [countryLayer, stateLayer, quebecLayer, savedLayer, draftLayer, montrealLayer], view: new View({ center: fromLonLat([view.longitude, view.latitude]), zoom: view.zoom, minZoom: 3, maxZoom: 8 }) });
     mapRef.current = map;
-    map.on("click", (event) => { const [longitude, latitude] = toLonLat(event.coordinate); onMapClick([latitude, longitude]); });
-    return () => { map.setTarget(undefined); mapRef.current = null; };
-  }, [category, countryData, draft, onMapClick, quebecData, region, savedPolygonData, stateData]);
+    let freehandPoints: [number, number][] = [];
+    let drawingFreehand = false;
+    const viewport = map.getViewport();
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!freehand) return;
+      drawingFreehand = true;
+      event.preventDefault();
+      const [longitude, latitude] = toLonLat(map.getEventCoordinate(event));
+      freehandPoints = [[latitude, longitude]];
+    };
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!drawingFreehand) return;
+      const [longitude, latitude] = toLonLat(map.getEventCoordinate(event));
+      const lastPoint = freehandPoints[freehandPoints.length - 1];
+      if (!lastPoint || Math.abs(lastPoint[0] - latitude) + Math.abs(lastPoint[1] - longitude) > 0.01) freehandPoints.push([latitude, longitude]);
+    };
+    const handlePointerUp = (event: PointerEvent) => {
+      if (!drawingFreehand) return;
+      event.preventDefault();
+      drawingFreehand = false;
+      if (freehandPoints.length > 2) onFreehandComplete(freehandPoints);
+      freehandPoints = [];
+    };
+    viewport.addEventListener("pointerdown", handlePointerDown);
+    viewport.addEventListener("pointermove", handlePointerMove);
+    viewport.addEventListener("pointerup", handlePointerUp);
+    map.on("click", (event) => {
+      if (freehand) return;
+      const [longitude, latitude] = toLonLat(event.coordinate);
+      onMapClick([latitude, longitude]);
+    });
+    return () => { viewport.removeEventListener("pointerdown", handlePointerDown); viewport.removeEventListener("pointermove", handlePointerMove); viewport.removeEventListener("pointerup", handlePointerUp); map.setTarget(undefined); mapRef.current = null; };
+  }, [category, countryData, draft, freehand, onFreehandComplete, onMapClick, quebecData, region, savedPolygonData, stateData]);
 
   const exportMapAsPng = () => {
     const map = mapRef.current;
@@ -153,6 +184,7 @@ export default function WeatherEditor() {
   const [category, setCategory] = useState<RiskCategory>("Slight");
   const [draft, setDraft] = useState<[number, number][]>([]);
   const [drawing, setDrawing] = useState(false);
+  const [freehand, setFreehand] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dataError, setDataError] = useState("");
   const [email, setEmail] = useState("");
@@ -256,7 +288,7 @@ export default function WeatherEditor() {
         <div className="hazard-tabs">{hazards.map((item) => <button key={item.value} type="button" className={hazard === item.value ? "hazard-tab active" : "hazard-tab"} onClick={() => { setHazard(item.value); setDraft([]); }}><span>{item.short}</span>{item.value === "Severe Thunderstorms" ? "Severe" : item.value}</button>)}</div>
         <div className="rail-heading category-heading"><span className="section-kicker">Risk category</span><strong>Convective probability</strong></div>
         <div className="category-list">{(Object.keys(riskMeta) as RiskCategory[]).map((item) => <button key={item} type="button" className={category === item ? "category-button active" : "category-button"} style={{ "--category-color": riskMeta[item].color, "--category-ink": riskMeta[item].ink } as React.CSSProperties} onClick={() => setCategory(item)}><span className="category-swatch" />{item}<small>{riskMeta[item].short}</small></button>)}</div>
-        <div className="rail-actions"><button type="button" className={drawing ? "tool-button active" : "tool-button"} onClick={() => { setDrawing(!drawing); setDraft([]); }}>{drawing ? "Stop drawing" : "Draw polygon"}</button><button type="button" className="tool-button quiet" onClick={() => setDraft([])}>Clear draft</button></div>
+        <div className="rail-actions"><button type="button" className={drawing ? "tool-button active" : "tool-button"} onClick={() => { setDrawing(!drawing); setDraft([]); }}>{drawing ? "Stop drawing" : "Draw polygon"}</button><button type="button" className={freehand ? "tool-button active" : "tool-button"} onClick={() => { setFreehand(!freehand); setDrawing(true); setDraft([]); }}>Pencil</button><button type="button" className="tool-button quiet" onClick={() => setDraft([])}>Clear draft</button></div>
         <div className="rail-status"><span className="status-mark" />{dataError || (drawing ? "Click map to add vertices" : "Ready for edits")}<strong>{summary} · {hazard}</strong></div>
       </aside>
       <div className="maplibre-map">
@@ -264,6 +296,7 @@ export default function WeatherEditor() {
           key={`${region}-${countryData ? "ready" : "loading"}-${stateData ? "ready" : "loading"}-${quebecData ? "ready" : "loading"}`}
           region={region}
           selectedDay={selectedDay}
+          freehand={freehand}
           countryData={countryData}
           stateData={stateData}
           quebecData={quebecData}
@@ -271,6 +304,7 @@ export default function WeatherEditor() {
           draft={draft}
           category={category}
           onMapClick={(point) => { if (drawing) setDraft([...draft, point]); }}
+          onFreehandComplete={(points) => { if (drawing) setDraft(points); }}
         />
       </div>
       {draft.length > 2 && <button className="floating-save" type="button" onClick={() => void saveShape({ day: selectedDay, hazard, category, points: draft })}>Save Polygon</button>}
