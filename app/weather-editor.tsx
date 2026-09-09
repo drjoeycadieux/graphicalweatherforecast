@@ -16,8 +16,6 @@ import Stroke from "ol/style/Stroke.js";
 import Style from "ol/style/Style.js";
 import VectorLayer from "ol/layer/Vector.js";
 import VectorSource from "ol/source/Vector.js";
-import TileLayer from "ol/layer/Tile.js";
-import OSM from "ol/source/OSM.js";
 import { type User, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { addDoc, collection, getDocs, orderBy, query, serverTimestamp } from "firebase/firestore";
 
@@ -95,7 +93,7 @@ function PoliticalMap({ region, countryData, stateData, savedPolygonData, draft,
       draftSource.addFeature(new Feature({ geometry: new LineString(draft.map(([lat, lng]) => fromLonLat([lng, lat]))), outline: riskMeta[category].ink }));
     }
     const draftLayer = new VectorLayer({ source: draftSource, style: (feature) => new Style({ fill: new Fill({ color: `${feature.get("fill") ?? "#f5df62"}85` }), stroke: new Stroke({ color: String(feature.get("outline") ?? riskMeta[category].ink), width: 2, lineDash: [6, 5] }) }) });
-    const map = new Map({ target: container, layers: [new TileLayer({ source: new OSM() }), countryLayer, stateLayer, savedLayer, draftLayer], view: new View({ center: fromLonLat([view.longitude, view.latitude]), zoom: view.zoom, minZoom: 3, maxZoom: 8 }) });
+    const map = new Map({ target: container, layers: [countryLayer, stateLayer, savedLayer, draftLayer], view: new View({ center: fromLonLat([view.longitude, view.latitude]), zoom: view.zoom, minZoom: 3, maxZoom: 8 }) });
     map.on("click", (event) => { const [longitude, latitude] = toLonLat(event.coordinate); onMapClick([latitude, longitude]); });
     return () => map.setTarget(undefined);
   }, [category, countryData, draft, onMapClick, region, savedPolygonData, stateData]);
