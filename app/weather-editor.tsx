@@ -10,10 +10,13 @@ import Map from "ol/Map.js";
 import View from "ol/View.js";
 import { fromLonLat, toLonLat } from "ol/proj.js";
 import LineString from "ol/geom/LineString.js";
+import Point from "ol/geom/Point.js";
 import Polygon from "ol/geom/Polygon.js";
+import CircleStyle from "ol/style/Circle.js";
 import Fill from "ol/style/Fill.js";
 import Stroke from "ol/style/Stroke.js";
 import Style from "ol/style/Style.js";
+import Text from "ol/style/Text.js";
 import VectorLayer from "ol/layer/Vector.js";
 import VectorSource from "ol/source/Vector.js";
 import { type User, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
@@ -51,6 +54,7 @@ const regionViews: Record<MapRegion, { longitude: number; latitude: number; zoom
 
 const US_COUNTRIES_GEOJSON = "/api/map-data/countries";
 const US_STATES_GEOJSON = "/api/map-data/states";
+const QUEBEC_GEOJSON = "/api/map-data/quebec";
 
 type PolygonFeature = {
   type: "Feature";
@@ -68,15 +72,15 @@ function polygonCollection(features: PolygonFeature[]) {
   return { type: "FeatureCollection" as const, features };
 }
 
-function PoliticalMap({ region, countryData, stateData, savedPolygonData, draft, category, onMapClick }: {
-  region: MapRegion; countryData: GeoJsonCollection | null; stateData: GeoJsonCollection | null;
+function PoliticalMap({ region, countryData, stateData, quebecData, savedPolygonData, draft, category, onMapClick }: {
+  region: MapRegion; countryData: GeoJsonCollection | null; stateData: GeoJsonCollection | null; quebecData: GeoJsonCollection | null;
   savedPolygonData: ReturnType<typeof polygonCollection>; draft: [number, number][];
   category: RiskCategory; onMapClick: (point: [number, number]) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!countryData || !stateData) return;
+    if (!countryData || !stateData || !quebecData) return;
     const container = containerRef.current;
     if (!container) return;
     const view = regionViews[region];
@@ -84,6 +88,7 @@ function PoliticalMap({ region, countryData, stateData, savedPolygonData, draft,
     const boundaryStyle = (fill: string, stroke: string, width: number) => new Style({ fill: new Fill({ color: fill }), stroke: new Stroke({ color: stroke, width }) });
     const countryLayer = new VectorLayer({ source: new VectorSource({ features: geoJson.readFeatures(countryData, { featureProjection: "EPSG:3857" }) }), style: boundaryStyle("#c9c0b1", "#8e8577", 1) });
     const stateLayer = new VectorLayer({ source: new VectorSource({ features: geoJson.readFeatures(stateData, { featureProjection: "EPSG:3857" }) }), style: boundaryStyle("#f6efe3", "#6f675b", 1.1) });
+    const quebecLayer = new VectorLayer({ source: new VectorSource({ features: geoJson.readFeatures(quebecData, { featureProjection: "EPSG:3857" }) }), visible: region === "Quebec", style: boundaryStyle("#e8f0ed", "#35605a", 1.5) });
     const savedSource = new VectorSource({ features: geoJson.readFeatures(savedPolygonData, { featureProjection: "EPSG:3857" }) });
     const savedLayer = new VectorLayer({ source: savedSource, style: (feature) => boundaryStyle(String(feature.get("fill") ?? "#f5df62"), String(feature.get("outline") ?? "#7a6500"), 2) });
     const draftSource = new VectorSource();
@@ -93,12 +98,20 @@ function PoliticalMap({ region, countryData, stateData, savedPolygonData, draft,
       draftSource.addFeature(new Feature({ geometry: new LineString(draft.map(([lat, lng]) => fromLonLat([lng, lat]))), outline: riskMeta[category].ink }));
     }
     const draftLayer = new VectorLayer({ source: draftSource, style: (feature) => new Style({ fill: new Fill({ color: `${feature.get("fill") ?? "#f5df62"}85` }), stroke: new Stroke({ color: String(feature.get("outline") ?? riskMeta[category].ink), width: 2, lineDash: [6, 5] }) }) });
-    const map = new Map({ target: container, layers: [countryLayer, stateLayer, savedLayer, draftLayer], view: new View({ center: fromLonLat([view.longitude, view.latitude]), zoom: view.zoom, minZoom: 3, maxZoom: 8 }) });
+    const montrealLayer = new VectorLayer({
+      source: new VectorSource({ features: [new Feature({ geometry: new Point(fromLonLat([-73.5673, 45.5017])) })] }),
+      visible: region === "Quebec",
+      style: new Style({
+        image: new CircleStyle({ radius: 5, fill: new Fill({ color: "#193b4a" }), stroke: new Stroke({ color: "#ffffff", width: 2 }) }),
+        text: new Text({ text: "Montreal", offsetY: -16, font: "600 13px sans-serif", fill: new Fill({ color: "#193b4a" }), stroke: new Stroke({ color: "#ffffff", width: 3 }) }),
+      }),
+    });
+    const map = new Map({ target: container, layers: [countryLayer, stateLayer, quebecLayer, savedLayer, draftLayer, montrealLayer], view: new View({ center: fromLonLat([view.longitude, view.latitude]), zoom: view.zoom, minZoom: 3, maxZoom: 8 }) });
     map.on("click", (event) => { const [longitude, latitude] = toLonLat(event.coordinate); onMapClick([latitude, longitude]); });
     return () => map.setTarget(undefined);
-  }, [category, countryData, draft, onMapClick, region, savedPolygonData, stateData]);
+  }, [category, countryData, draft, onMapClick, quebecData, region, savedPolygonData, stateData]);
 
-  if (!countryData || !stateData) {
+  if (!countryData || !stateData || !quebecData) {
     return <div className="maplibre-canvas map-loading">Loading political map...</div>;
   }
 
@@ -122,6 +135,7 @@ export default function WeatherEditor() {
   const [authReady, setAuthReady] = useState(!auth);
   const [countryData, setCountryData] = useState<GeoJsonCollection | null>(null);
   const [stateData, setStateData] = useState<GeoJsonCollection | null>(null);
+  const [quebecData, setQuebecData] = useState<GeoJsonCollection | null>(null);
 
   useEffect(() => {
     if (!auth) return;
@@ -158,11 +172,12 @@ export default function WeatherEditor() {
   useEffect(() => {
     const loadMapData = async () => {
       try {
-        const [countriesResponse, statesResponse] = await Promise.all([fetch(US_COUNTRIES_GEOJSON), fetch(US_STATES_GEOJSON)]);
-        if (!countriesResponse.ok || !statesResponse.ok) throw new Error("Map boundary data could not be loaded.");
-        const [countries, states] = await Promise.all([countriesResponse.json(), statesResponse.json()]) as [GeoJsonCollection, GeoJsonCollection];
+        const [countriesResponse, statesResponse, quebecResponse] = await Promise.all([fetch(US_COUNTRIES_GEOJSON), fetch(US_STATES_GEOJSON), fetch(QUEBEC_GEOJSON)]);
+        if (!countriesResponse.ok || !statesResponse.ok || !quebecResponse.ok) throw new Error("Map boundary data could not be loaded.");
+        const [countries, states, quebec] = await Promise.all([countriesResponse.json(), statesResponse.json(), quebecResponse.json()]) as [GeoJsonCollection, GeoJsonCollection, GeoJsonCollection];
         setCountryData(countries);
         setStateData(states);
+        setQuebecData(quebec);
       } catch (error) {
         console.error("Could not load map boundaries:", error);
       }
@@ -219,10 +234,11 @@ export default function WeatherEditor() {
       </aside>
       <div className="maplibre-map">
         <PoliticalMap
-          key={`${region}-${countryData ? "ready" : "loading"}-${stateData ? "ready" : "loading"}`}
+          key={`${region}-${countryData ? "ready" : "loading"}-${stateData ? "ready" : "loading"}-${quebecData ? "ready" : "loading"}`}
           region={region}
           countryData={countryData}
           stateData={stateData}
+          quebecData={quebecData}
           savedPolygonData={savedPolygonData}
           draft={draft}
           category={category}
