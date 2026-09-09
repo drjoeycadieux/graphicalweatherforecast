@@ -72,12 +72,14 @@ function polygonCollection(features: PolygonFeature[]) {
   return { type: "FeatureCollection" as const, features };
 }
 
-function PoliticalMap({ region, countryData, stateData, quebecData, savedPolygonData, draft, category, onMapClick }: {
+function PoliticalMap({ region, selectedDay, countryData, stateData, quebecData, savedPolygonData, draft, category, onMapClick }: {
+  selectedDay: OutlookDay;
   region: MapRegion; countryData: GeoJsonCollection | null; stateData: GeoJsonCollection | null; quebecData: GeoJsonCollection | null;
   savedPolygonData: ReturnType<typeof polygonCollection>; draft: [number, number][];
   category: RiskCategory; onMapClick: (point: [number, number]) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<Map | null>(null);
 
   useEffect(() => {
     if (!countryData || !stateData || !quebecData) return;
@@ -107,15 +109,40 @@ function PoliticalMap({ region, countryData, stateData, quebecData, savedPolygon
       }),
     });
     const map = new Map({ target: container, layers: [countryLayer, stateLayer, quebecLayer, savedLayer, draftLayer, montrealLayer], view: new View({ center: fromLonLat([view.longitude, view.latitude]), zoom: view.zoom, minZoom: 3, maxZoom: 8 }) });
+    mapRef.current = map;
     map.on("click", (event) => { const [longitude, latitude] = toLonLat(event.coordinate); onMapClick([latitude, longitude]); });
-    return () => map.setTarget(undefined);
+    return () => { map.setTarget(undefined); mapRef.current = null; };
   }, [category, countryData, draft, onMapClick, quebecData, region, savedPolygonData, stateData]);
+
+  const exportMapAsPng = () => {
+    const map = mapRef.current;
+    const size = map?.getSize();
+    if (!map || !size) return;
+    map.renderSync();
+    const exportCanvas = document.createElement("canvas");
+    exportCanvas.width = size[0];
+    exportCanvas.height = size[1];
+    const context = exportCanvas.getContext("2d");
+    if (!context) return;
+    context.fillStyle = "#e5e7eb";
+    context.fillRect(0, 0, size[0], size[1]);
+    map.getViewport().querySelectorAll("canvas").forEach((canvas) => {
+      if (canvas.width === 0 || canvas.height === 0) return;
+      context.globalAlpha = Number(canvas.parentElement?.style.opacity || 1);
+      context.drawImage(canvas, 0, 0);
+    });
+    context.globalAlpha = 1;
+    const link = document.createElement("a");
+    link.download = `weather-outlook-${region.toLowerCase()}-day-${selectedDay}.png`;
+    link.href = exportCanvas.toDataURL("image/png");
+    link.click();
+  };
 
   if (!countryData || !stateData || !quebecData) {
     return <div className="maplibre-canvas map-loading">Loading political map...</div>;
   }
 
-  return <div ref={containerRef} className="maplibre-canvas openlayers-canvas" />;
+  return <div ref={containerRef} className="maplibre-canvas openlayers-canvas"><button type="button" className="map-export-button" onClick={exportMapAsPng} title="Download map as PNG">Download PNG</button></div>;
 }
 
 export default function WeatherEditor() {
@@ -236,6 +263,7 @@ export default function WeatherEditor() {
         <PoliticalMap
           key={`${region}-${countryData ? "ready" : "loading"}-${stateData ? "ready" : "loading"}-${quebecData ? "ready" : "loading"}`}
           region={region}
+          selectedDay={selectedDay}
           countryData={countryData}
           stateData={stateData}
           quebecData={quebecData}

@@ -321,6 +321,27 @@ h2 {
   height: 100%;
 }
 
+.map-export-button {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 500;
+  border: 1px solid rgba(25, 59, 74, 0.25);
+  border-radius: 8px;
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #193b4a;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.12);
+}
+
+.map-export-button:hover {
+  background: #193b4a;
+  color: #ffffff;
+}
+
 .floating-save {
   position: absolute;
   right: 18px;
