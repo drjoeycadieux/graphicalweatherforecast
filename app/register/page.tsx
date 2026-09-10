@@ -18,10 +18,7 @@ export default function RegisterPage() {
   const [created, setCreated] = useState(false);
 
   useEffect(() => {
-    if (!auth) {
-      router.replace("/public");
-      return;
-    }
+    if (!auth) return;
     return onAuthStateChanged(auth, (nextUser) => {
       setUser(nextUser);
       setAuthReady(true);
@@ -53,7 +50,17 @@ export default function RegisterPage() {
   };
 
   if (!auth) {
-    return null;
+    return (
+      <main className="auth-page">
+        <div className="auth-brand"><span className="brand-mark">N</span><span>North American Desk</span></div>
+        <section className="auth-card auth-card-centered">
+          <span className="section-kicker">Firebase setup required</span>
+          <h1>Login / Register is unavailable</h1>
+          <p>Add your Firebase environment values, then reload the app to enable editor sign-in.</p>
+          <Link className="tool-button active auth-button-link" href="/public">Back to public map</Link>
+        </section>
+      </main>
+    );
   }
 
   return (
