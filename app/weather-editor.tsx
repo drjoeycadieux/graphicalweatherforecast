@@ -294,11 +294,11 @@ export default function WeatherEditor({ mode = "editor" }: { mode?: "public" | "
     {!isPublicView && (!auth ? (
       <div className="auth-card">
         <h2>Editor access</h2>
-        <p>Connect Firebase to enable login and publishing.</p>
-        <Link className="tool-button active auth-button-link" href="/register">Login / Register</Link>
+        <p>Firebase is not configured yet. Public outlooks remain available.</p>
+        <Link className="tool-button active auth-button-link" href="/public">Back to public map</Link>
       </div>
     ) : auth && !user && authReady ? (
-      <form className="auth-card" onSubmit={login}><h2>Editor access</h2><p>Sign in to publish outlook shapes.</p><input type="email" placeholder="Email" value={email} onChange={(event) => setEmail(event.target.value)} /><input type="password" placeholder="Password" value={password} onChange={(event) => setPassword(event.target.value)} />{authError && <span className="auth-error">{authError}</span>}<button type="submit" className="tool-button active">Sign in</button><Link className="auth-link" href="/register">Create an editor account</Link></form>
+      <form className="auth-card" onSubmit={login}><h2>Editor access</h2><p>Sign in to publish outlook shapes.</p><input type="email" placeholder="Email" value={email} onChange={(event) => setEmail(event.target.value)} /><input type="password" placeholder="Password" value={password} onChange={(event) => setPassword(event.target.value)} />{authError && <span className="auth-error">{authError}</span>}<button type="submit" className="tool-button active">Sign in</button></form>
     ) : null)}
     {(isPublicView || (auth && !user && authReady ? false : true)) ? <div className={isPublicView ? "map-shell public-map-shell" : "map-shell"}>
       {!isPublicView && <aside className="editor-rail">
