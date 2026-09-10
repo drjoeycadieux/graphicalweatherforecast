@@ -4,9 +4,9 @@ import dynamic from "next/dynamic";
 
 const WeatherEditor = dynamic(() => import("./weather-editor"), {
   ssr: false,
-  loading: () => <div className="map-loading">Loading SPC workspace...</div>,
+  loading: () => <div className="map-loading">Loading public outlook...</div>,
 });
 
 export default function Home() {
-  return <WeatherEditor />;
+  return <WeatherEditor mode="public" />;
 }

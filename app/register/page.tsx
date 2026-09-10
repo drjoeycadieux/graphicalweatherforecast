@@ -47,6 +47,20 @@ export default function RegisterPage() {
     }
   };
 
+  if (!auth) {
+    return (
+      <main className="auth-page">
+        <div className="auth-brand"><span className="brand-mark">N</span><span>North American Desk</span></div>
+        <section className="auth-card auth-card-centered">
+          <span className="section-kicker">Firebase setup required</span>
+          <h1>Login / Register is unavailable</h1>
+          <p>Add your Firebase environment values, then reload the app to enable editor sign-in.</p>
+          <Link className="tool-button active auth-button-link" href="/public">Back to public map</Link>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="auth-page">
       <div className="auth-brand"><span className="brand-mark">N</span><span>North American Desk</span></div>
@@ -67,7 +81,7 @@ export default function RegisterPage() {
           <input id="register-confirmation" type="password" autoComplete="new-password" required minLength={6} placeholder="Enter password again" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} />
           {error ? <span className="auth-error">{error}</span> : null}
           <button type="submit" className="tool-button active">Create account</button>
-          <Link className="auth-link" href="/">Already have an account? Sign in</Link>
+          <Link className="auth-link" href="/public">Already have an account? Sign in</Link>
         </form>
       )}
     </main>
