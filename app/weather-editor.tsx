@@ -290,7 +290,15 @@ export default function WeatherEditor() {
       <div className="forecast-badge"><span className="live-dot" /> NOAA / SPC style editor</div>
     </header>
 
-    {auth && !user && authReady ? <form className="auth-card" onSubmit={login}><h2>Editor access</h2><p>Sign in to publish outlook shapes.</p><input type="email" placeholder="Email" value={email} onChange={(event) => setEmail(event.target.value)} /><input type="password" placeholder="Password" value={password} onChange={(event) => setPassword(event.target.value)} />{authError && <span className="auth-error">{authError}</span>}<button type="submit" className="tool-button active">Sign in</button><Link className="auth-link" href="/register">Create an editor account</Link></form> : null}
+    {!auth ? (
+      <div className="auth-card">
+        <h2>Editor access</h2>
+        <p>Connect Firebase to enable login and publishing.</p>
+        <Link className="tool-button active auth-button-link" href="/register">Login / Register</Link>
+      </div>
+    ) : auth && !user && authReady ? (
+      <form className="auth-card" onSubmit={login}><h2>Editor access</h2><p>Sign in to publish outlook shapes.</p><input type="email" placeholder="Email" value={email} onChange={(event) => setEmail(event.target.value)} /><input type="password" placeholder="Password" value={password} onChange={(event) => setPassword(event.target.value)} />{authError && <span className="auth-error">{authError}</span>}<button type="submit" className="tool-button active">Sign in</button><Link className="auth-link" href="/register">Create an editor account</Link></form>
+    ) : null}
     {auth && !user && authReady ? null : <div className="map-shell">
       <aside className="editor-rail">
         {auth && user ? <div className="rail-user"><span className="rail-user-label">Signed in as</span><strong>{user.email}</strong><button type="button" className="rail-signout" onClick={() => void logout()}>Sign out</button></div> : null}
