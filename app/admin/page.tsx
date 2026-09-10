@@ -50,12 +50,21 @@ export default function AdminPage() {
 
   useEffect(() => {
     const loadAreas = async () => {
-      if (!db) { setDataError("Connect Firebase to load forecast areas."); setLoading(false); return; }
+      if (!db) {
+        setDataError("Firebase Firestore is not enabled yet. Create the Firestore database in Firebase Console to load forecast areas.");
+        setLoading(false);
+        return;
+      }
+
       try {
         const snapshot = await getDocs(query(collection(db, "forecast-areas"), orderBy("createdAt", "desc")));
         setLocations(snapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as ForecastArea) })));
-      } catch (error) { console.error("Could not load forecast areas:", error); setDataError("Firestore could not load forecast areas."); }
-      finally { setLoading(false); }
+      } catch (error) {
+        console.error("Could not load forecast areas:", error);
+        setDataError("Firestore could not load forecast areas. Check that the database exists and the rules allow access.");
+      } finally {
+        setLoading(false);
+      }
     };
     void loadAreas();
   }, []);

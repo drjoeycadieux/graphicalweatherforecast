@@ -31,6 +31,27 @@ type RiskCategory = "General Thunder" | "Marginal" | "Slight" | "Enhanced" | "Mo
 type OutlookShape = { id?: string; day: OutlookDay; hazard: Hazard; category: RiskCategory; points: [number, number][]; createdAt?: unknown; updatedAt?: unknown };
 type GeoJsonCollection = FeatureCollection<Geometry, GeoJsonProperties>;
 
+function getFirestoreStatusMessage(error: unknown) {
+  if (typeof error === "object" && error && "code" in error) {
+    const code = String((error as { code?: string }).code ?? "");
+    if (code === "failed-precondition") {
+      return "Firestore is not enabled for this project. Create the Firestore database in Firebase Console and try again.";
+    }
+    if (code === "permission-denied") {
+      return "Firestore rules are blocking access. Update the rules to allow reads and writes for this app.";
+    }
+    if (code === "unavailable") {
+      return "Firestore is temporarily unavailable. Please try again in a moment.";
+    }
+  }
+
+  if (error instanceof Error && error.message.toLowerCase().includes("timed out")) {
+    return "Firestore request timed out. Enable Firestore and confirm the project is connected correctly.";
+  }
+
+  return "Firestore could not load outlooks. Check that the database exists and the rules allow access.";
+}
+
 const riskMeta: Record<RiskCategory, { color: string; ink: string; short: string }> = {
   "General Thunder": { color: "#c9c9c9", ink: "#5d636b", short: "T" },
   Marginal: { color: "#7fc97f", ink: "#28633c", short: "MRGL" },
@@ -217,10 +238,16 @@ export default function WeatherEditor({ mode = "editor" }: { mode?: "public" | "
 
   useEffect(() => {
     const load = async () => {
-      if (!db) { setDataError("Connect Firebase to load and publish outlooks."); setLoading(false); return; }
+      if (!db) {
+        setDataError("Firebase Firestore is not enabled yet. Create the Firestore database in Firebase Console to load and publish outlooks.");
+        setLoading(false);
+        return;
+      }
+
       const timeout = new Promise<never>((_, reject) => {
-        window.setTimeout(() => reject(new Error("Firestore request timed out.")), 8000);
+        window.setTimeout(() => reject(new Error("Firestore request timed out.")), 5000);
       });
+
       try {
         const snapshot = await Promise.race([getDocs(query(collection(db, "spc-outlooks"), orderBy("createdAt", "asc"))), timeout]);
         const results = snapshot.docs.map((doc) => {
@@ -236,8 +263,12 @@ export default function WeatherEditor({ mode = "editor" }: { mode?: "public" | "
           } satisfies OutlookShape;
         });
         setShapes(results);
-      } catch (error) { console.error("Could not load SPC outlooks:", error); setDataError("Firestore could not load outlooks."); }
-      finally { setLoading(false); }
+      } catch (error) {
+        console.error("Could not load SPC outlooks:", error);
+        setDataError(getFirestoreStatusMessage(error));
+      } finally {
+        setLoading(false);
+      }
     };
     void load();
   }, []);
