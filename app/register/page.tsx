@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createUserWithEmailAndPassword, onAuthStateChanged, type User } from "firebase/auth";
 
 import { auth } from "@/lib/firebase";
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(!auth);
   const [email, setEmail] = useState("");
@@ -16,12 +18,15 @@ export default function RegisterPage() {
   const [created, setCreated] = useState(false);
 
   useEffect(() => {
-    if (!auth) return;
+    if (!auth) {
+      router.replace("/public");
+      return;
+    }
     return onAuthStateChanged(auth, (nextUser) => {
       setUser(nextUser);
       setAuthReady(true);
     });
-  }, []);
+  }, [router]);
 
   const register = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -48,17 +53,7 @@ export default function RegisterPage() {
   };
 
   if (!auth) {
-    return (
-      <main className="auth-page">
-        <div className="auth-brand"><span className="brand-mark">N</span><span>North American Desk</span></div>
-        <section className="auth-card auth-card-centered">
-          <span className="section-kicker">Firebase setup required</span>
-          <h1>Login / Register is unavailable</h1>
-          <p>Add your Firebase environment values, then reload the app to enable editor sign-in.</p>
-          <Link className="tool-button active auth-button-link" href="/public">Back to public map</Link>
-        </section>
-      </main>
-    );
+    return null;
   }
 
   return (

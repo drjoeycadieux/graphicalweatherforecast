@@ -300,7 +300,7 @@ export default function WeatherEditor({ mode = "editor" }: { mode?: "public" | "
     ) : auth && !user && authReady ? (
       <form className="auth-card" onSubmit={login}><h2>Editor access</h2><p>Sign in to publish outlook shapes.</p><input type="email" placeholder="Email" value={email} onChange={(event) => setEmail(event.target.value)} /><input type="password" placeholder="Password" value={password} onChange={(event) => setPassword(event.target.value)} />{authError && <span className="auth-error">{authError}</span>}<button type="submit" className="tool-button active">Sign in</button><Link className="auth-link" href="/register">Create an editor account</Link></form>
     ) : null)}
-    {(isPublicView || (auth && !user && authReady ? false : true)) ? <div className="map-shell">
+    {(isPublicView || (auth && !user && authReady ? false : true)) ? <div className={isPublicView ? "map-shell public-map-shell" : "map-shell"}>
       {!isPublicView && <aside className="editor-rail">
         {auth && user ? <div className="rail-user"><span className="rail-user-label">Signed in as</span><strong>{user.email}</strong><button type="button" className="rail-signout" onClick={() => void logout()}>Sign out</button></div> : null}
         <div className="rail-heading"><span className="section-kicker">Outlook period</span><strong>Valid forecast</strong></div>
@@ -314,19 +314,21 @@ export default function WeatherEditor({ mode = "editor" }: { mode?: "public" | "
         <div className="rail-actions"><button type="button" className={drawing && drawMode === "polygon" ? "tool-button active" : "tool-button"} onClick={() => { setDrawMode("polygon"); setDrawing(!drawing); setDraft([]); }}>{drawing && drawMode === "polygon" ? "Stop drawing" : "Draw polygon"}</button><button type="button" className={drawing && drawMode === "pencil" ? "tool-button active" : "tool-button"} onClick={() => { setDrawMode("pencil"); setDrawing(true); setDraft([]); }}>Pencil</button><button type="button" className={drawing && drawMode === "rectangle" ? "tool-button active" : "tool-button"} onClick={() => { setDrawMode("rectangle"); setDrawing(true); setDraft([]); }}>Rectangle</button><button type="button" className={drawing && drawMode === "quick" ? "tool-button active" : "tool-button"} onClick={() => { setDrawMode("quick"); setDrawing(true); setDraft([]); }}>Quick area</button><button type="button" className="tool-button quiet" onClick={() => setDraft([])}>Clear draft</button></div>
         <div className="rail-status"><span className="status-mark" />{dataError || (drawing ? "Click map to add vertices" : "Ready for edits")}<strong>{summary} · {hazard}</strong></div>
       </aside>}
-      {isPublicView && (
-        <aside className="editor-rail">
-          <div className="rail-heading"><span className="section-kicker">Outlook period</span><strong>Valid forecast</strong></div>
-          <div className="day-tabs">{([1, 2, 3] as OutlookDay[]).map((day) => <button key={day} type="button" className={selectedDay === day ? "day-tab active" : "day-tab"} onClick={() => setSelectedDay(day)}><span>DAY</span>{day}</button>)}</div>
-          <div className="rail-heading category-heading"><span className="section-kicker">Map region</span><strong>Forecast area</strong></div>
-          <div className="region-tabs">{(["USA", "Quebec", "Ontario"] as MapRegion[]).map((item) => <button key={item} type="button" className={region === item ? "region-tab active" : "region-tab"} onClick={() => setRegion(item)}>{item}</button>)}</div>
-          <div className="rail-heading category-heading"><span className="section-kicker">Outlook type</span><strong>Hazard</strong></div>
-          <div className="hazard-tabs">{hazards.map((item) => <button key={item.value} type="button" className={hazard === item.value ? "hazard-tab active" : "hazard-tab"} onClick={() => setHazard(item.value)}><span>{item.short}</span>{item.value === "Severe Thunderstorms" ? "Severe" : item.value}</button>)}</div>
-          <div className="rail-status"><span className="status-mark"/>{dataError || "Public outlook briefing"}<strong>{summary} · {hazard}</strong></div>
-          <Link className="tool-button active auth-button-link" href="/editor">Editor login</Link>
-        </aside>
-      )}
-      <div className="maplibre-map">
+      {isPublicView && <div className="public-toolbar-strip">
+        <div className="public-toolbar-group">
+          <button type="button" className={selectedDay === 1 ? "public-chip active" : "public-chip"} onClick={() => setSelectedDay(1)}>Day 1</button>
+          <button type="button" className={selectedDay === 2 ? "public-chip active" : "public-chip"} onClick={() => setSelectedDay(2)}>Day 2</button>
+          <button type="button" className={selectedDay === 3 ? "public-chip active" : "public-chip"} onClick={() => setSelectedDay(3)}>Day 3</button>
+        </div>
+        <div className="public-toolbar-group">
+          {(["USA", "Quebec", "Ontario"] as MapRegion[]).map((item) => <button key={item} type="button" className={region === item ? "public-chip active" : "public-chip"} onClick={() => setRegion(item)}>{item}</button>)}
+        </div>
+        <div className="public-toolbar-group">
+          {hazards.map((item) => <button key={item.value} type="button" className={hazard === item.value ? "public-chip active" : "public-chip"} onClick={() => setHazard(item.value)}>{item.short}</button>)}
+        </div>
+        <Link className="public-editor-link" href="/editor">Editor login</Link>
+      </div>}
+      <div className={isPublicView ? "maplibre-map public-map" : "maplibre-map"}>
         <PoliticalMap
           key={`${region}-${countryData ? "ready" : "loading"}-${stateData ? "ready" : "loading"}-${quebecData ? "ready" : "loading"}-${ontarioData ? "ready" : "loading"}`}
           region={region}

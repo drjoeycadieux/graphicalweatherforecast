@@ -11,13 +11,13 @@ export default function ProtectedEditorPage() {
 
   useEffect(() => {
     if (!auth) {
-      router.replace("/register");
+      router.replace("/public");
       return;
     }
 
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (!user) {
-        router.replace("/register");
+        router.replace("/public");
       }
     });
 
