@@ -25,7 +25,7 @@ import { addDoc, collection, getDocs, orderBy, query, serverTimestamp } from "fi
 import { auth, db } from "@/lib/firebase";
 
 type OutlookDay = 1 | 2 | 3;
-type MapRegion = "USA" | "Quebec";
+type MapRegion = "USA" | "Quebec" | "Ontario";
 type Hazard = "Severe Thunderstorms" | "Tornado" | "Wind" | "Hail";
 type RiskCategory = "General Thunder" | "Marginal" | "Slight" | "Enhanced" | "Moderate" | "High";
 type OutlookShape = { id?: string; day: OutlookDay; hazard: Hazard; category: RiskCategory; points: [number, number][]; createdAt?: unknown; updatedAt?: unknown };
@@ -50,11 +50,13 @@ const hazards: { value: Hazard; short: string }[] = [
 const regionViews: Record<MapRegion, { longitude: number; latitude: number; zoom: number }> = {
   USA: { longitude: -96, latitude: 38.5, zoom: 4 },
   Quebec: { longitude: -72, latitude: 51.5, zoom: 5 },
+  Ontario: { longitude: -85, latitude: 51, zoom: 5 },
 };
 
 const US_COUNTRIES_GEOJSON = "/api/map-data/countries";
 const US_STATES_GEOJSON = "/api/map-data/states";
 const QUEBEC_GEOJSON = "/api/map-data/quebec";
+const ONTARIO_GEOJSON = "/api/map-data/ontario";
 
 type PolygonFeature = {
   type: "Feature";
@@ -72,10 +74,10 @@ function polygonCollection(features: PolygonFeature[]) {
   return { type: "FeatureCollection" as const, features };
 }
 
-function PoliticalMap({ region, selectedDay, drawMode, countryData, stateData, quebecData, savedPolygonData, draft, category, onMapClick, onFreehandComplete }: {
+function PoliticalMap({ region, selectedDay, drawMode, countryData, stateData, quebecData, ontarioData, savedPolygonData, draft, category, onMapClick, onFreehandComplete }: {
   selectedDay: OutlookDay;
   drawMode: "polygon" | "pencil" | "rectangle" | "quick";
-  region: MapRegion; countryData: GeoJsonCollection | null; stateData: GeoJsonCollection | null; quebecData: GeoJsonCollection | null;
+  region: MapRegion; countryData: GeoJsonCollection | null; stateData: GeoJsonCollection | null; quebecData: GeoJsonCollection | null; ontarioData: GeoJsonCollection | null;
   savedPolygonData: ReturnType<typeof polygonCollection>; draft: [number, number][];
   category: RiskCategory; onMapClick: (point: [number, number]) => void; onFreehandComplete: (points: [number, number][]) => void;
 }) {
@@ -83,7 +85,7 @@ function PoliticalMap({ region, selectedDay, drawMode, countryData, stateData, q
   const mapRef = useRef<Map | null>(null);
 
   useEffect(() => {
-    if (!countryData || !stateData || !quebecData) return;
+    if (!countryData || !stateData || !quebecData || !ontarioData) return;
     const container = containerRef.current;
     if (!container) return;
     const view = regionViews[region];
@@ -92,6 +94,7 @@ function PoliticalMap({ region, selectedDay, drawMode, countryData, stateData, q
     const countryLayer = new VectorLayer({ source: new VectorSource({ features: geoJson.readFeatures(countryData, { featureProjection: "EPSG:3857" }) }), style: boundaryStyle("#c9c0b1", "#8e8577", 1) });
     const stateLayer = new VectorLayer({ source: new VectorSource({ features: geoJson.readFeatures(stateData, { featureProjection: "EPSG:3857" }) }), style: boundaryStyle("#f6efe3", "#6f675b", 1.1) });
     const quebecLayer = new VectorLayer({ source: new VectorSource({ features: geoJson.readFeatures(quebecData, { featureProjection: "EPSG:3857" }) }), visible: region === "Quebec", style: boundaryStyle("#e8f0ed", "#35605a", 1.5) });
+    const ontarioLayer = new VectorLayer({ source: new VectorSource({ features: geoJson.readFeatures(ontarioData, { featureProjection: "EPSG:3857" }) }), visible: region === "Ontario", style: boundaryStyle("#edf4f0", "#2e5b4e", 1.6) });
     const savedSource = new VectorSource({ features: geoJson.readFeatures(savedPolygonData, { featureProjection: "EPSG:3857" }) });
     const savedLayer = new VectorLayer({ source: savedSource, style: (feature) => boundaryStyle(String(feature.get("fill") ?? "#f5df62"), String(feature.get("outline") ?? "#7a6500"), 2) });
     const draftSource = new VectorSource();
@@ -109,7 +112,7 @@ function PoliticalMap({ region, selectedDay, drawMode, countryData, stateData, q
         text: new Text({ text: "Montreal", offsetY: -16, font: "600 13px sans-serif", fill: new Fill({ color: "#193b4a" }), stroke: new Stroke({ color: "#ffffff", width: 3 }) }),
       }),
     });
-    const map = new Map({ target: container, layers: [countryLayer, stateLayer, quebecLayer, savedLayer, draftLayer, montrealLayer], view: new View({ center: fromLonLat([view.longitude, view.latitude]), zoom: view.zoom, minZoom: 3, maxZoom: 8 }) });
+    const map = new Map({ target: container, layers: [countryLayer, stateLayer, quebecLayer, ontarioLayer, savedLayer, draftLayer, montrealLayer], view: new View({ center: fromLonLat([view.longitude, view.latitude]), zoom: view.zoom, minZoom: 3, maxZoom: 8 }) });
     mapRef.current = map;
     let freehandPoints: [number, number][] = [];
     let drawingFreehand = false;
@@ -152,7 +155,7 @@ function PoliticalMap({ region, selectedDay, drawMode, countryData, stateData, q
       }
     });
     return () => { viewport.removeEventListener("pointerdown", handlePointerDown); viewport.removeEventListener("pointermove", handlePointerMove); viewport.removeEventListener("pointerup", handlePointerUp); map.setTarget(undefined); mapRef.current = null; };
-  }, [category, countryData, draft, drawMode, onFreehandComplete, onMapClick, quebecData, region, savedPolygonData, stateData]);
+  }, [category, countryData, draft, drawMode, onFreehandComplete, onMapClick, ontarioData, quebecData, region, savedPolygonData, stateData]);
 
   const exportMapAsPng = () => {
     const map = mapRef.current;
@@ -178,7 +181,7 @@ function PoliticalMap({ region, selectedDay, drawMode, countryData, stateData, q
     link.click();
   };
 
-  if (!countryData || !stateData || !quebecData) {
+  if (!countryData || !stateData || !quebecData || !ontarioData) {
     return <div className="maplibre-canvas map-loading">Loading political map...</div>;
   }
 
@@ -204,6 +207,7 @@ export default function WeatherEditor() {
   const [countryData, setCountryData] = useState<GeoJsonCollection | null>(null);
   const [stateData, setStateData] = useState<GeoJsonCollection | null>(null);
   const [quebecData, setQuebecData] = useState<GeoJsonCollection | null>(null);
+  const [ontarioData, setOntarioData] = useState<GeoJsonCollection | null>(null);
 
   useEffect(() => {
     if (!auth) return;
@@ -240,12 +244,13 @@ export default function WeatherEditor() {
   useEffect(() => {
     const loadMapData = async () => {
       try {
-        const [countriesResponse, statesResponse, quebecResponse] = await Promise.all([fetch(US_COUNTRIES_GEOJSON), fetch(US_STATES_GEOJSON), fetch(QUEBEC_GEOJSON)]);
-        if (!countriesResponse.ok || !statesResponse.ok || !quebecResponse.ok) throw new Error("Map boundary data could not be loaded.");
-        const [countries, states, quebec] = await Promise.all([countriesResponse.json(), statesResponse.json(), quebecResponse.json()]) as [GeoJsonCollection, GeoJsonCollection, GeoJsonCollection];
+        const [countriesResponse, statesResponse, quebecResponse, ontarioResponse] = await Promise.all([fetch(US_COUNTRIES_GEOJSON), fetch(US_STATES_GEOJSON), fetch(QUEBEC_GEOJSON), fetch(ONTARIO_GEOJSON)]);
+        if (!countriesResponse.ok || !statesResponse.ok || !quebecResponse.ok || !ontarioResponse.ok) throw new Error("Map boundary data could not be loaded.");
+        const [countries, states, quebec, ontario] = await Promise.all([countriesResponse.json(), statesResponse.json(), quebecResponse.json(), ontarioResponse.json()]) as [GeoJsonCollection, GeoJsonCollection, GeoJsonCollection, GeoJsonCollection];
         setCountryData(countries);
         setStateData(states);
         setQuebecData(quebec);
+        setOntarioData(ontario);
       } catch (error) {
         console.error("Could not load map boundaries:", error);
       }
@@ -292,7 +297,7 @@ export default function WeatherEditor() {
         <div className="rail-heading"><span className="section-kicker">Outlook period</span><strong>Valid forecast</strong></div>
         <div className="day-tabs">{([1, 2, 3] as OutlookDay[]).map((day) => <button key={day} type="button" className={selectedDay === day ? "day-tab active" : "day-tab"} onClick={() => { setSelectedDay(day); setDraft([]); }}><span>DAY</span>{day}</button>)}</div>
         <div className="rail-heading category-heading"><span className="section-kicker">Map region</span><strong>Forecast area</strong></div>
-        <div className="region-tabs">{(["USA", "Quebec"] as MapRegion[]).map((item) => <button key={item} type="button" className={region === item ? "region-tab active" : "region-tab"} onClick={() => { setRegion(item); setDraft([]); }}>{item}</button>)}</div>
+        <div className="region-tabs">{(["USA", "Quebec", "Ontario"] as MapRegion[]).map((item) => <button key={item} type="button" className={region === item ? "region-tab active" : "region-tab"} onClick={() => { setRegion(item); setDraft([]); }}>{item}</button>)}</div>
         <div className="rail-heading category-heading"><span className="section-kicker">Outlook type</span><strong>Hazard</strong></div>
         <div className="hazard-tabs">{hazards.map((item) => <button key={item.value} type="button" className={hazard === item.value ? "hazard-tab active" : "hazard-tab"} onClick={() => { setHazard(item.value); setDraft([]); }}><span>{item.short}</span>{item.value === "Severe Thunderstorms" ? "Severe" : item.value}</button>)}</div>
         <div className="rail-heading category-heading"><span className="section-kicker">Risk category</span><strong>Convective probability</strong></div>
@@ -302,13 +307,14 @@ export default function WeatherEditor() {
       </aside>
       <div className="maplibre-map">
         <PoliticalMap
-          key={`${region}-${countryData ? "ready" : "loading"}-${stateData ? "ready" : "loading"}-${quebecData ? "ready" : "loading"}`}
+          key={`${region}-${countryData ? "ready" : "loading"}-${stateData ? "ready" : "loading"}-${quebecData ? "ready" : "loading"}-${ontarioData ? "ready" : "loading"}`}
           region={region}
           selectedDay={selectedDay}
           drawMode={drawMode}
           countryData={countryData}
           stateData={stateData}
           quebecData={quebecData}
+          ontarioData={ontarioData}
           savedPolygonData={savedPolygonData}
           draft={draft}
           category={category}
