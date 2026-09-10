@@ -319,7 +319,10 @@ export default function WeatherEditor({ mode = "editor" }: { mode?: "public" | "
   return <main className="page-shell">
     <header className="forecast-header">
       <div><p className="eyebrow">{isPublicView ? "Public forecast view" : "SPC outlook workstation"}</p><h1>{isPublicView ? "Severe Weather Outlook" : "Severe Weather Drawing Desk"}</h1></div>
-      <div className="forecast-badge"><span className="live-dot" /> {isPublicView ? "Public briefing" : "NOAA / SPC style editor"}</div>
+      <div className="forecast-badge" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <span className="live-dot" /> {isPublicView ? "Public briefing" : "NOAA / SPC style editor"}
+        {auth && user ? <button type="button" className="tool-button quiet" onClick={() => void logout()} style={{ padding: "0.5rem 0.85rem", fontSize: 12 }}>Log out</button> : null}
+      </div>
     </header>
 
     {!isPublicView && (!auth ? (
