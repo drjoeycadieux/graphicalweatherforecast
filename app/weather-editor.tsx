@@ -26,7 +26,8 @@ import { auth, db } from "@/lib/firebase";
 
 type OutlookDay = 1 | 2 | 3;
 type MapRegion = "USA" | "Quebec" | "Ontario";
-type Hazard = "Severe Thunderstorms" | "Tornado" | "Wind" | "Hail";
+type HazardMode = "Severe" | "Winter";
+type Hazard = "Severe Thunderstorms" | "Tornado" | "Wind" | "Hail" | "Snow Storm" | "Ice Storm" | "Blizzard" | "Freezing Rain" | "Heavy Snow" | "Wind Chill";
 type RiskCategory = "General Thunder" | "Marginal" | "Slight" | "Enhanced" | "Moderate" | "High";
 type OutlookShape = { id?: string; day: OutlookDay; hazard: Hazard; category: RiskCategory; points: [number, number][]; createdAt?: unknown; updatedAt?: unknown };
 type GeoJsonCollection = FeatureCollection<Geometry, GeoJsonProperties>;
@@ -61,12 +62,22 @@ const riskMeta: Record<RiskCategory, { color: string; ink: string; short: string
   High: { color: "#c14f88", ink: "#68183f", short: "HIGH" },
 };
 
-const hazards: { value: Hazard; short: string }[] = [
-  { value: "Severe Thunderstorms", short: "ALL" },
-  { value: "Tornado", short: "TOR" },
-  { value: "Wind", short: "WND" },
-  { value: "Hail", short: "HAIL" },
-];
+const hazardSets: Record<HazardMode, { value: Hazard; short: string }[]> = {
+  Severe: [
+    { value: "Severe Thunderstorms", short: "ALL" },
+    { value: "Tornado", short: "TOR" },
+    { value: "Wind", short: "WND" },
+    { value: "Hail", short: "HAIL" },
+  ],
+  Winter: [
+    { value: "Snow Storm", short: "SNOW" },
+    { value: "Ice Storm", short: "ICE" },
+    { value: "Blizzard", short: "BLZD" },
+    { value: "Freezing Rain", short: "FZRN" },
+    { value: "Heavy Snow", short: "HEAVY" },
+    { value: "Wind Chill", short: "CHILL" },
+  ],
+};
 
 const regionViews: Record<MapRegion, { longitude: number; latitude: number; zoom: number }> = {
   USA: { longitude: -96, latitude: 38.5, zoom: 4 },
@@ -214,6 +225,7 @@ export default function WeatherEditor({ mode = "editor" }: { mode?: "public" | "
   const [shapes, setShapes] = useState<OutlookShape[]>([]);
   const [selectedDay, setSelectedDay] = useState<OutlookDay>(1);
   const [region, setRegion] = useState<MapRegion>("USA");
+  const [hazardMode, setHazardMode] = useState<HazardMode>("Severe");
   const [hazard, setHazard] = useState<Hazard>("Severe Thunderstorms");
   const [category, setCategory] = useState<RiskCategory>("Slight");
   const [draft, setDraft] = useState<[number, number][]>([]);
@@ -290,11 +302,18 @@ export default function WeatherEditor({ mode = "editor" }: { mode?: "public" | "
     void loadMapData();
   }, []);
 
+  const activeHazards = hazardSets[hazardMode];
   const canEdit = Boolean(db) && (!auth || Boolean(user));
   const summary = useMemo(() => `${shapes.filter((shape) => shape.day === selectedDay && shape.hazard === hazard).length} areas plotted`, [hazard, selectedDay, shapes]);
   const savedPolygonData = useMemo(() => polygonCollection(shapes
     .filter((shape) => shape.day === selectedDay && shape.hazard === hazard && shape.points.length > 2)
     .map((shape) => polygonFeature(shape.points, riskMeta[shape.category].color, riskMeta[shape.category].ink, 0.5))), [hazard, selectedDay, shapes]);
+
+  const changeHazardMode = (nextMode: HazardMode) => {
+    setHazardMode(nextMode);
+    setHazard(hazardSets[nextMode][0].value);
+    setDraft([]);
+  };
 
   const saveShape = async (shape: OutlookShape) => {
     if (!canEdit || !db) return;
@@ -341,8 +360,10 @@ export default function WeatherEditor({ mode = "editor" }: { mode?: "public" | "
         <div className="day-tabs">{([1, 2, 3] as OutlookDay[]).map((day) => <button key={day} type="button" className={selectedDay === day ? "day-tab active" : "day-tab"} onClick={() => { setSelectedDay(day); setDraft([]); }}><span>DAY</span>{day}</button>)}</div>
         <div className="rail-heading category-heading"><span className="section-kicker">Map region</span><strong>Forecast area</strong></div>
         <div className="region-tabs">{(["USA", "Quebec", "Ontario"] as MapRegion[]).map((item) => <button key={item} type="button" className={region === item ? "region-tab active" : "region-tab"} onClick={() => { setRegion(item); setDraft([]); }}>{item}</button>)}</div>
-        <div className="rail-heading category-heading"><span className="section-kicker">Outlook type</span><strong>Hazard</strong></div>
-        <div className="hazard-tabs">{hazards.map((item) => <button key={item.value} type="button" className={hazard === item.value ? "hazard-tab active" : "hazard-tab"} onClick={() => { setHazard(item.value); setDraft([]); }}><span>{item.short}</span>{item.value === "Severe Thunderstorms" ? "Severe" : item.value}</button>)}</div>
+        <div className="rail-heading category-heading"><span className="section-kicker">Outlook type</span><strong>Warning mode</strong></div>
+        <div className="hazard-tabs">{(["Severe", "Winter"] as HazardMode[]).map((mode) => <button key={mode} type="button" className={hazardMode === mode ? "hazard-tab active" : "hazard-tab"} onClick={() => changeHazardMode(mode)}><span>{mode === "Severe" ? "SEV" : "WIN"}</span>{mode}</button>)}</div>
+        <div className="rail-heading category-heading"><span className="section-kicker">Hazard</span><strong>{hazardMode === "Severe" ? "Severe weather" : "Winter weather"}</strong></div>
+        <div className="hazard-tabs">{activeHazards.map((item) => <button key={item.value} type="button" className={hazard === item.value ? "hazard-tab active" : "hazard-tab"} onClick={() => { setHazard(item.value); setDraft([]); }}><span>{item.short}</span>{item.value}</button>)}</div>
         <div className="rail-heading category-heading"><span className="section-kicker">Risk category</span><strong>Convective probability</strong></div>
         <div className="category-list">{(Object.keys(riskMeta) as RiskCategory[]).map((item) => <button key={item} type="button" className={category === item ? "category-button active" : "category-button"} style={{ "--category-color": riskMeta[item].color, "--category-ink": riskMeta[item].ink } as React.CSSProperties} onClick={() => setCategory(item)}><span className="category-swatch" />{item}<small>{riskMeta[item].short}</small></button>)}</div>
         <div className="rail-actions"><button type="button" className={drawing && drawMode === "polygon" ? "tool-button active" : "tool-button"} onClick={() => { setDrawMode("polygon"); setDrawing(!drawing); setDraft([]); }}>{drawing && drawMode === "polygon" ? "Stop drawing" : "Draw polygon"}</button><button type="button" className={drawing && drawMode === "pencil" ? "tool-button active" : "tool-button"} onClick={() => { setDrawMode("pencil"); setDrawing(true); setDraft([]); }}>Pencil</button><button type="button" className={drawing && drawMode === "rectangle" ? "tool-button active" : "tool-button"} onClick={() => { setDrawMode("rectangle"); setDrawing(true); setDraft([]); }}>Rectangle</button><button type="button" className={drawing && drawMode === "quick" ? "tool-button active" : "tool-button"} onClick={() => { setDrawMode("quick"); setDrawing(true); setDraft([]); }}>Quick area</button><button type="button" className="tool-button quiet" onClick={() => setDraft([])}>Clear draft</button></div>
@@ -358,7 +379,10 @@ export default function WeatherEditor({ mode = "editor" }: { mode?: "public" | "
           {(["USA", "Quebec", "Ontario"] as MapRegion[]).map((item) => <button key={item} type="button" className={region === item ? "public-chip active" : "public-chip"} onClick={() => setRegion(item)}>{item}</button>)}
         </div>
         <div className="public-toolbar-group">
-          {hazards.map((item) => <button key={item.value} type="button" className={hazard === item.value ? "public-chip active" : "public-chip"} onClick={() => setHazard(item.value)}>{item.short}</button>)}
+          {(["Severe", "Winter"] as HazardMode[]).map((mode) => <button key={mode} type="button" className={hazardMode === mode ? "public-chip active" : "public-chip"} onClick={() => changeHazardMode(mode)}>{mode === "Severe" ? "Severe" : "Winter"}</button>)}
+        </div>
+        <div className="public-toolbar-group">
+          {activeHazards.map((item) => <button key={item.value} type="button" className={hazard === item.value ? "public-chip active" : "public-chip"} onClick={() => setHazard(item.value)}>{item.short}</button>)}
         </div>
         <Link className="public-editor-link" href="/editor">Editor login</Link>
       </div>}
