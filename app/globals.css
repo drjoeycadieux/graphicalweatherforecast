@@ -287,10 +287,34 @@ h2 {
 }
 
 .public-map-shell {
+  isolation: isolate;
   border-radius: 18px;
   border-color: rgba(148, 163, 184, 0.22);
   box-shadow: 0 18px 34px rgba(15, 23, 42, 0.10);
   overflow: hidden;
+}
+
+.public-map-shell::before,
+.public-map-shell::after {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  width: 64px;
+  height: 64px;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  background: rgba(202, 216, 226, 0.72);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+  content: "";
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.public-map-shell::before {
+  left: -32px;
+}
+
+.public-map-shell::after {
+  right: -32px;
 }
 
 .public-toolbar-strip {
@@ -961,6 +985,11 @@ h2 {
 
   .map-shell {
     min-height: 760px;
+  }
+
+  .public-map-shell::before,
+  .public-map-shell::after {
+    display: none;
   }
 
   .editor-rail {
