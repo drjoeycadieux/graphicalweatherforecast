@@ -40,6 +40,26 @@ body {
   padding: 18px 18px 28px;
 }
 
+.public-page-shell-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+.public-page-shell-wrap > * {
+  width: min(1200px, 100%);
+}
+
+.public-page-shell-wrap .forecast-header {
+  display: flex;
+  justify-content: center;
+  text-align: center;
+  margin: 0 auto 10px;
+}
+
+.public-page-shell-wrap .map-shell {
+  margin: 0 auto;
+}
+
 .forecast-header {
   display: flex;
   align-items: center;
@@ -286,6 +306,10 @@ h2 {
   box-shadow: 0 22px 40px rgba(15, 23, 42, 0.08);
 }
 
+.public-page-shell-wrap .map-shell {
+  max-width: 1200px;
+}
+
 .public-map-shell {
   isolation: isolate;
   border-radius: 18px;
@@ -320,11 +344,15 @@ h2 {
 .public-toolbar-strip {
   position: absolute;
   top: 16px;
-  left: 18px;
-  right: 18px;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  width: calc(100% - 36px);
+  max-width: 1120px;
   z-index: 700;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
   flex-wrap: wrap;
   padding: 10px 12px;

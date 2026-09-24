@@ -335,7 +335,7 @@ export default function WeatherEditor({ mode = "editor" }: { mode?: "public" | "
     if (auth) await signOut(auth);
   };
 
-  return <main className="page-shell">
+  return <main className={isPublicView ? "page-shell public-page-shell-wrap" : "page-shell"}>
     <header className="forecast-header">
       <div><p className="eyebrow">{isPublicView ? "Public forecast view" : "SPC outlook workstation"}</p><h1>{isPublicView ? "Severe Weather Outlook" : "Severe Weather Drawing Desk"}</h1></div>
       <div className="forecast-badge" style={{ display: "flex", alignItems: "center", gap: 12 }}>
