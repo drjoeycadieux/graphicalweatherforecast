@@ -386,22 +386,24 @@ export default function WeatherEditor({ mode = "editor" }: { mode?: "public" | "
         </div>
         <Link className="public-editor-link" href="/editor">Editor login</Link>
       </div>}
-      <div className={isPublicView ? "maplibre-map public-map" : "maplibre-map"}>
-        <PoliticalMap
-          key={`${region}-${countryData ? "ready" : "loading"}-${stateData ? "ready" : "loading"}-${quebecData ? "ready" : "loading"}-${ontarioData ? "ready" : "loading"}`}
-          region={region}
-          selectedDay={selectedDay}
-          drawMode={drawMode}
-          countryData={countryData}
-          stateData={stateData}
-          quebecData={quebecData}
-          ontarioData={ontarioData}
-          savedPolygonData={savedPolygonData}
-          draft={draft}
-          category={category}
-          onMapClick={(point) => { if (!isPublicView && drawing) setDraft([...draft, point]); }}
-          onFreehandComplete={(points) => { if (!isPublicView && drawing) setDraft(points); }}
-        />
+      <div className={isPublicView ? "map-frame public-map-frame" : "map-frame"}>
+        <div className={isPublicView ? "maplibre-map public-map" : "maplibre-map"}>
+          <PoliticalMap
+            key={`${region}-${countryData ? "ready" : "loading"}-${stateData ? "ready" : "loading"}-${quebecData ? "ready" : "loading"}-${ontarioData ? "ready" : "loading"}`}
+            region={region}
+            selectedDay={selectedDay}
+            drawMode={drawMode}
+            countryData={countryData}
+            stateData={stateData}
+            quebecData={quebecData}
+            ontarioData={ontarioData}
+            savedPolygonData={savedPolygonData}
+            draft={draft}
+            category={category}
+            onMapClick={(point) => { if (!isPublicView && drawing) setDraft([...draft, point]); }}
+            onFreehandComplete={(points) => { if (!isPublicView && drawing) setDraft(points); }}
+          />
+        </div>
       </div>
       {!isPublicView && draft.length > 2 && <button className="floating-save" type="button" onClick={() => void saveShape({ day: selectedDay, hazard, category, points: draft })}>Save Polygon</button>}
       {loading ? <div className="map-data-status">Loading saved outlooks...</div> : null}

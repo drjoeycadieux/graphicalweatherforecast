@@ -422,6 +422,18 @@ h2 {
   background: #e5e7eb;
 }
 
+.map-frame {
+  position: relative;
+  width: calc(100% - 22px);
+  height: calc(100% - 22px);
+  margin: 11px auto;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 20px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2), 0 16px 28px rgba(15, 23, 42, 0.08);
+}
+
 .maplibre-map {
   width: 100%;
   height: 100%;
