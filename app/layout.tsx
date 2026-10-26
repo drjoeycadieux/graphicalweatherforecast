@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+
+import SiteHeader from "./site-header";
+
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,8 +16,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Severe Weather Drawing Desk",
-  description: "A MapLibre workspace for drawing SPC Day 1, Day 2, and Day 3 outlook areas.",
+  title: {
+    default: "Graphical Weather Forecast",
+    template: "%s · Graphical Weather Forecast",
+  },
+  description: "A shared workspace for drawing and publishing SPC Day 1, Day 2, and Day 3 severe and winter weather outlooks.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -23,7 +29,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+      <SiteHeader />
+      {children}
+    </body>
     </html>
   );
 }

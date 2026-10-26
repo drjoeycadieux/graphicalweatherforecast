@@ -46,6 +46,9 @@ export default function AdminPage() {
   const [locations, setLocations] = useState<ForecastArea[]>([]);
   const [loading, setLoading] = useState(true);
   const [dataError, setDataError] = useState("");
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newArea, setNewArea] = useState("");
+  const [adding, setAdding] = useState(false);
   const visibleSources = useMemo(() => sources.filter((source) => region === "Both" || source.country === region), [region]);
 
   useEffect(() => {
@@ -69,15 +72,24 @@ export default function AdminPage() {
     void loadAreas();
   }, []);
 
-  const addLocation = async () => {
-    const name = window.prompt("Forecast area name");
-    if (!name?.trim()) return;
+  const addLocation = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const name = newArea.trim();
+    if (!name) return;
     if (!db) { setDataError("Connect Firebase before adding forecast areas."); return; }
-    const area = { name: name.trim(), country: region, detail: "New work area", createdAt: serverTimestamp() };
+    setAdding(true);
+    const area = { name, country: region, detail: "New work area", createdAt: serverTimestamp(), updated: "Just now" };
     try {
       const ref = await addDoc(collection(db, "forecast-areas"), area);
-      setLocations((current) => [{ ...area, id: ref.id, updated: "Just now" }, ...current]);
-    } catch (error) { console.error("Could not save forecast area:", error); setDataError("Firestore could not save this forecast area."); }
+      setLocations((current) => [{ ...area, id: ref.id }, ...current]);
+      setNewArea("");
+      setShowAddForm(false);
+    } catch (error) {
+      console.error("Could not save forecast area:", error);
+      setDataError("Firestore could not save this forecast area.");
+    } finally {
+      setAdding(false);
+    }
   };
 
   return (
@@ -90,7 +102,7 @@ export default function AdminPage() {
         </div>
         <div className="admin-header-actions">
           <span className="admin-status"><span className="live-dot" /> Desk online</span>
-          <Link className="admin-link" href="/">Open drawing desk</Link>
+          <Link className="admin-link" href="/editor">Open drawing desk</Link>
         </div>
       </header>
 
@@ -101,7 +113,7 @@ export default function AdminPage() {
             <button key={item} type="button" className={region === item ? "region-tab active" : "region-tab"} onClick={() => setRegion(item)}>{item === "Both" ? "Canada + USA" : item}</button>
           ))}
         </div>
-        <span className="toolbar-updated">Last checked 2 min ago</span>
+        <span className="toolbar-updated">Official source links</span>
       </section>
 
       <section className="source-grid">
@@ -117,10 +129,26 @@ export default function AdminPage() {
 
       <section className="admin-content-grid">
         <div className="admin-panel">
-          <div className="panel-heading"><div><span className="section-kicker">Monitoring list</span><h2>Forecast areas</h2></div><button type="button" className="add-button" onClick={addLocation}>+ Add area</button></div>
+          <div className="panel-heading"><div><span className="section-kicker">Monitoring list</span><h2>Forecast areas</h2></div><button type="button" className="add-button" onClick={() => setShowAddForm((current) => !current)}>{showAddForm ? "Close" : "+ Add area"}</button></div>
+          {showAddForm ? (
+            <form className="add-area-form" onSubmit={addLocation}>
+              <label htmlFor="area-name">Forecast area name</label>
+              <div className="add-area-row">
+                <input
+                  id="area-name"
+                  value={newArea}
+                  onChange={(event) => setNewArea(event.target.value)}
+                  placeholder="e.g. Southern Ontario"
+                  autoFocus
+                />
+                <button type="submit" className="add-button" disabled={!newArea.trim() || adding}>{adding ? "Adding…" : "Add area"}</button>
+                <button type="button" className="add-button" onClick={() => { setShowAddForm(false); setNewArea(""); }}>Cancel</button>
+              </div>
+            </form>
+          ) : null}
           <div className="location-list">
             {loading ? <div className="admin-empty">Loading forecast areas...</div> : locations.filter((location) => region === "Both" || location.country === region || location.country === "Both").map((location) => (
-              <div className="location-row" key={location.name}><span className="location-pin" /><div><strong>{location.name}</strong><small>{location.detail}</small></div><time>{location.updated}</time><span className="row-chevron">›</span></div>
+              <div className="location-row" key={location.id ?? location.name}><span className="location-pin" /><div><strong>{location.name}</strong><small>{location.detail}</small></div><time>{location.updated ?? "—"}</time><span className="row-chevron" aria-hidden="true">›</span></div>
             ))}
             {!loading && !locations.filter((location) => region === "Both" || location.country === region || location.country === "Both").length ? <div className="admin-empty">No forecast areas configured.</div> : null}
           </div>
@@ -128,7 +156,7 @@ export default function AdminPage() {
         <aside className="admin-panel readiness-panel">
           <div className="panel-heading"><div><span className="section-kicker">Shift handoff</span><h2>Desk readiness</h2></div><span className="readiness-score">4 / 4</span></div>
           <div className="readiness-list"><div><span className="checkmark">✓</span><span>National sources connected</span></div><div><span className="checkmark">✓</span><span>Coverage regions selected</span></div><div><span className="checkmark">✓</span><span>SPC outlook desk available</span></div><div><span className="checkmark">✓</span><span>Drawing workspace ready</span></div></div>
-          <Link className="desk-link" href="/">Continue to outlook polygons <span aria-hidden="true">→</span></Link>
+          <Link className="desk-link" href="/editor">Continue to outlook polygons <span aria-hidden="true">→</span></Link>
         </aside>
       </section>
 
