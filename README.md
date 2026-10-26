@@ -1,4 +1,10 @@
-This is a Leaflet and Firebase workspace for drawing SPC severe weather outlooks across Canada and the United States.
+This is an OpenLayers and Firebase workspace for drawing SPC severe and winter weather outlooks across Canada and the United States.
+
+## Pages
+
+- `/` and `/public` — public outlook viewer with day, region, outlook type, and hazard controls.
+- `/editor` — protected drawing desk with polygon, pencil, rectangle, and quick-area tools.
+- `/admin` — forecast source directory and desk checklist.
 
 ## Firebase setup
 
@@ -6,7 +12,7 @@ Copy `.env.example` to `.env.local` and fill in the Firebase Web App configurati
 
 The app uses these Firestore collections:
 
-- `spc-outlooks`: outlook polygons with `day`, `hazard`, `category`, and `points` fields. Hazards are `Severe Thunderstorms`, `Tornado`, `Wind`, and `Hail`.
+- `spc-outlooks`: outlook polygons with `day`, `hazard`, `category`, and `points` fields. Hazards include severe weather (`Severe Thunderstorms`, `Tornado`, `Wind`, `Hail`) and winter weather (`Snow Storm`, `Ice Storm`, `Blizzard`, `Freezing Rain`, `Heavy Snow`, `Wind Chill`).
 - `forecast-areas`: admin monitoring areas with `name`, `country`, and `detail` fields.
 
 When Firebase is not configured, the app intentionally shows empty states and disables editing. No forecast or monitoring data is bundled in the application.

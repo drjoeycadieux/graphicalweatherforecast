@@ -539,10 +539,6 @@ button {
   margin-top: 19px;
 }
 
-.category-heading {
-  margin-top: 19px;
-}
-
 .day-tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1576,8 +1572,18 @@ button {
     overflow-y: hidden;
     border-right: 0;
     border-bottom: 1px solid var(--rail-line);
-    padding: 12px;
+    padding: 12px 12px 14px;
     scrollbar-width: thin;
+  }
+
+  .editor-rail::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+
+  .editor-rail::-webkit-scrollbar-thumb {
+    border-radius: 4px;
+    background: #42606a;
   }
 
   .rail-section {
@@ -1588,6 +1594,10 @@ button {
 
   .rail-section + .rail-section {
     margin-top: 0;
+  }
+
+  .rail-tools {
+    order: -1;
   }
 
   .editor-workspace .map-frame {

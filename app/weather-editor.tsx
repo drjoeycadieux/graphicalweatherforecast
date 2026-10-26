@@ -574,6 +574,14 @@ export default function WeatherEditor({ mode = "editor" }: { mode?: "public" | "
     return () => window.clearTimeout(timer);
   }, [notice]);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDrawing(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const activeHazards = hazardSets[hazardMode];
   const canEdit = Boolean(db) && (!auth || Boolean(user));
   const mapReady = Boolean(countryData && stateData && quebecData && ontarioData);
@@ -588,6 +596,7 @@ export default function WeatherEditor({ mode = "editor" }: { mode?: "public" | "
   );
 
   const changeHazardMode = (nextMode: HazardMode) => {
+    if (nextMode === hazardMode) return;
     setHazardMode(nextMode);
     setHazard(hazardSets[nextMode][0].value);
     setDraft([]);
@@ -759,7 +768,7 @@ export default function WeatherEditor({ mode = "editor" }: { mode?: "public" | "
                     type="button"
                     className={selectedDay === day ? "day-tab active" : "day-tab"}
                     aria-pressed={selectedDay === day}
-                    onClick={() => { setSelectedDay(day); setDraft([]); }}
+                    onClick={() => { if (day !== selectedDay) { setSelectedDay(day); setDraft([]); } }}
                   >
                     <span>DAY</span>{day}
                   </button>
@@ -779,7 +788,7 @@ export default function WeatherEditor({ mode = "editor" }: { mode?: "public" | "
                     type="button"
                     className={region === item ? "region-tab active" : "region-tab"}
                     aria-pressed={region === item}
-                    onClick={() => { setRegion(item); setDraft([]); }}
+                    onClick={() => { if (item !== region) { setRegion(item); setDraft([]); } }}
                   >
                     {item}
                   </button>
@@ -819,7 +828,7 @@ export default function WeatherEditor({ mode = "editor" }: { mode?: "public" | "
                     type="button"
                     className={hazard === item.value ? "hazard-tab active" : "hazard-tab"}
                     aria-pressed={hazard === item.value}
-                    onClick={() => { setHazard(item.value); setDraft([]); }}
+                    onClick={() => { if (item.value !== hazard) { setHazard(item.value); setDraft([]); } }}
                   >
                     <span>{item.short}</span>{item.value}
                   </button>
@@ -848,7 +857,7 @@ export default function WeatherEditor({ mode = "editor" }: { mode?: "public" | "
               </div>
             </section>
 
-            <section className="rail-section">
+            <section className="rail-section rail-tools">
               <div className="rail-heading">
                 <span className="section-kicker">Drawing tools</span>
                 <strong>Add outlook areas</strong>

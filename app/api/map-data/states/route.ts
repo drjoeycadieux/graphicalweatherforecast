@@ -1,6 +1,6 @@
 import shp from "shpjs";
 
-const SOURCE_URL = "https://www2.census.gov/geo/tiger/TIGER2025/STATE/tl_2025_us_state.zip";
+const SOURCE_URL = "https://www2.census.gov/geo/tiger/GENZ2025/shp/cb_2025_us_state_20m.zip";
 
 export async function GET() {
   const response = await fetch(SOURCE_URL, { next: { revalidate: 86400 } });
