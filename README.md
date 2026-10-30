@@ -10,6 +10,8 @@ This is an OpenLayers and Firebase workspace for drawing SPC severe and winter w
 
 Copy `.env.example` to `.env.local` and fill in the Firebase Web App configuration values from the Firebase console. Enable Email/Password Authentication and create a Firestore database.
 
+Only `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, and `NEXT_PUBLIC_FIREBASE_APP_ID` are required. The remaining values are optional and can stay blank. Restart `npm run dev` after editing `.env.local`.
+
 The app uses these Firestore collections:
 
 - `spc-outlooks`: outlook polygons with `day`, `hazard`, `category`, and `points` fields. Hazards include severe weather (`Severe Thunderstorms`, `Tornado`, `Wind`, `Hail`) and winter weather (`Snow Storm`, `Ice Storm`, `Blizzard`, `Freezing Rain`, `Heavy Snow`, `Wind Chill`).

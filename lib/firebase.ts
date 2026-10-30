@@ -12,7 +12,17 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-const hasFirebaseConfig = Object.values(firebaseConfig).every((value) => Boolean(value));
+// Only these values are required for Email/Password auth and Firestore.
+// databaseURL, storageBucket, and messagingSenderId are optional in a
+// Firebase web config, so they must not block initialization.
+const requiredConfigKeys = ["apiKey", "authDomain", "projectId", "appId"] as const;
+
+const missingConfigKeys = requiredConfigKeys.filter((key) => !firebaseConfig[key]);
+const hasFirebaseConfig = missingConfigKeys.length === 0;
+
+export const firebaseConfigMissingKeys: string[] = missingConfigKeys.map(
+  (key) => `NEXT_PUBLIC_FIREBASE_${key.replace(/[A-Z]/g, (char) => `_${char}`).toUpperCase()}`,
+);
 
 const app = hasFirebaseConfig ? (getApps().length ? getApp() : initializeApp(firebaseConfig)) : null;
 export const db: Firestore | null = app ? getFirestore(app) : null;

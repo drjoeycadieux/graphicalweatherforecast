@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { addDoc, collection, getDocs, orderBy, query, serverTimestamp } from "firebase/firestore";
 
-import { db } from "@/lib/firebase";
+import { db, firebaseConfigMissingKeys } from "@/lib/firebase";
 
 type Region = "Both" | "USA" | "Canada";
 
@@ -54,7 +54,9 @@ export default function AdminPage() {
   useEffect(() => {
     const loadAreas = async () => {
       if (!db) {
-        setDataError("Firebase Firestore is not enabled yet. Create the Firestore database in Firebase Console to load forecast areas.");
+        setDataError(firebaseConfigMissingKeys.length
+          ? `Firebase is missing ${firebaseConfigMissingKeys.join(", ")}. Add them to .env.local and restart the dev server.`
+          : "Firebase Firestore is not enabled yet. Create the Firestore database in Firebase Console to load forecast areas.");
         setLoading(false);
         return;
       }

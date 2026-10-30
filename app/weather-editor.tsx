@@ -22,7 +22,7 @@ import VectorSource from "ol/source/Vector.js";
 import { type User, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { addDoc, collection, getDocs, orderBy, query, serverTimestamp } from "firebase/firestore";
 
-import { auth, db } from "@/lib/firebase";
+import { auth, db, firebaseConfigMissingKeys } from "@/lib/firebase";
 
 import "ol/ol.css";
 
@@ -492,7 +492,9 @@ export default function WeatherEditor({ mode = "editor" }: { mode?: "public" | "
       if (!db) {
         setDataError(isPublicView
           ? "Live outlook data is not connected for this deployment."
-          : "Firebase Firestore is not configured. You can explore the editor, but areas cannot be published.");
+          : firebaseConfigMissingKeys.length
+            ? `Firebase is missing ${firebaseConfigMissingKeys.join(", ")}. Add them to .env.local and restart the dev server.`
+            : "Firebase Firestore is not configured. You can explore the editor, but areas cannot be published.");
         setLoading(false);
         return;
       }
